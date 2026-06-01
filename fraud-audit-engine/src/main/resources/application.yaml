@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: fraud-audit-engine
+  
+  datasource:
+    url: jdbc:postgresql://ep-silent-bonus-aorgjarr.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+    username: neondb_owner
+    password: ${NEON_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  ai:
+    openai:
+      api-key: ${GEMINI_API_KEY}
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai
+      chat:
+        options:
+          model: gemini-2.5-flash
+
+  data:
+    redis:
+      host: alert-quail-141238.upstash.io
+      port: 6379
+      password: ${UPSTASH_REDIS_PASSWORD}
+      ssl:
+        enabled: true
+
+server:
+  port: 8080
