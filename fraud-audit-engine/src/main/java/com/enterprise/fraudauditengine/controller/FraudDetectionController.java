@@ -18,10 +18,7 @@ public class FraudDetectionController {
         this.fraudProducer = fraudProducer;
     }
 
-    /**
-     * Endpoint to trigger the high-velocity fraud event into the Redis stream.
-     * URL: POST http://localhost:8080/api/v1/audit/trigger
-     */
+    
     @PostMapping("/trigger")
     public ResponseEntity<String> triggerFraudProtocol() {
         try {

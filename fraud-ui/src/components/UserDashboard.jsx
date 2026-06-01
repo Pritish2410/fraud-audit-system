@@ -10,7 +10,7 @@ export default function UserDashboard() {
     
     try {
       // Hit the new POST endpoint on your Spring Boot server
-      await fetch('http://localhost:8080/api/v1/audit/trigger', {
+      await fetch('https://fraud-audit-engine.onrender.com/api/v1/audit/trigger', {
         method: 'POST'
       })
       
