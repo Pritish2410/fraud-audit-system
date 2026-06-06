@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import Login from './components/Login'
 import UserDashboard from './components/UserDashboard'
 import AdminDashboard from './components/AdminDashboard'
@@ -15,6 +17,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen font-sans text-slate-200 relative z-0 overflow-x-hidden">
+      <Analytics />
+      <SpeedInsights />
       
       {/* Intense Rainbow Mesh Background */}
       <div className="fixed inset-0 z-[-1] bg-[#020617] overflow-hidden pointer-events-none">
