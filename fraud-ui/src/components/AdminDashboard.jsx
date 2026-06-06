@@ -48,10 +48,11 @@ export default function AdminDashboard() {
   }, [])
 
   // Async Polling
+  // Async Polling
   const pollForReport = () => {
     const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/v1/audit/report')
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/audit/report`)
         const json = await res.json()
         
         // THE FIX: Check against our bulletproof helper function
