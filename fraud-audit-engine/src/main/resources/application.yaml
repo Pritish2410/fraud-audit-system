@@ -2,6 +2,11 @@ spring:
   application:
     name: fraud-audit-engine
   
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
   datasource:
     url: jdbc:postgresql://ep-silent-bonus-aorgjarr.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
     username: neondb_owner
@@ -33,3 +38,15 @@ spring:
 
 server:
   port: 8080
+
+csv:
+  aliases:
+    account: cc_num,account,id,customer,nameorig
+    amount: amt,amount,transaction_amount,value
+    category: category,merchant_category,type
+    location: city,location,state,ip,namedest
+
+gemini:
+  circuit-breaker:
+    cooldown-ms: 120000
+    max-retries: 2

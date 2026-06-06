@@ -4,6 +4,17 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Secrets and Environment Variables
+.env
+*.env
+
+# Compiled class files
+*.class
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
 ### STS ###
 .apt_generated
 .classpath
