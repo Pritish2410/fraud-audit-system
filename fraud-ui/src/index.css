@@ -11,3 +11,12 @@ body {
   background-color: var(--color-darker);
   color: #f8fafc;
 }
+
+@keyframes sweep {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.animate-sweep {
+  background-size: 200% auto;
+  animation: sweep 2s linear infinite;
+}

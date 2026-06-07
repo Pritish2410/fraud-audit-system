@@ -49,7 +49,7 @@ public class FraudScoringService {
             riskScore += 45; 
         }
 
-        if (history.size() >= 3) {
+        if (!request.isBatch() && history.size() >= 3) {
             riskScore += 25; 
         }
 

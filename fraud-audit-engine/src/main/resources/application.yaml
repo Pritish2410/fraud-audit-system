@@ -50,3 +50,11 @@ gemini:
   circuit-breaker:
     cooldown-ms: 120000
     max-retries: 2
+
+aws:
+  access-key-id: "d11168ef5ec192e69778c2437670b829"
+  secret-access-key: "f67d14249d1d73d32197ed4484792d27f54db271f20b2f687fb7bb2527582168"
+  region: "auto"
+  s3:
+    endpoint: "https://759dc11839520cb62fadf1d4b9863b29.r2.cloudflarestorage.com"
+    bucket-name: "fraud-vault"

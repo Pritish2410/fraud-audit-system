@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock } from 'lucide-react'
+import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 export default function AdminDashboard() {
@@ -11,6 +11,7 @@ export default function AdminDashboard() {
 
   // Persistent State
   const [accountState, setAccountState] = useState(() => localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
+  const [evidenceFile, setEvidenceFile] = useState(() => localStorage.getItem('WAYNE_ENT_EVIDENCE_FILE') || null)
   const [aiReport, setAiReport] = useState(() => localStorage.getItem('WAYNE_ENT_REPORT') || "Awaiting velocity event triggers...")
   const [aiLoading, setAiLoading] = useState(false)
 
@@ -217,6 +218,7 @@ export default function AdminDashboard() {
                     <th className="pb-4 font-bold">User ID</th>
                     <th className="pb-4 font-bold">Account Name</th>
                     <th className="pb-4 font-bold">Email</th>
+                    <th className="pb-4 font-bold text-center">Evidence</th>
                     <th className="pb-4 font-bold text-center">AI Report</th>
                     <th className="pb-4 font-bold text-right">Action</th>
                   </tr>
@@ -227,6 +229,22 @@ export default function AdminDashboard() {
                       <td className="py-4 px-2 font-mono text-sm text-slate-300">WAYNE_ENT_001</td>
                       <td className="py-4 px-2 font-medium text-white">Wayne Enterprises</td>
                       <td className="py-4 px-2 text-sm text-slate-400">admin@wayneenterprises.com</td>
+
+                      <td className="py-4 text-center">
+                        {evidenceFile ? (
+                          <a 
+                            href={`${import.meta.env.VITE_API_BASE_URL}/api/v1/datasets/download/${evidenceFile}`}
+                            download
+                            className="p-2 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-all duration-200 active:scale-90 mx-auto block w-max"
+                            title={`Download dataset: ${evidenceFile}`}
+                          >
+                            <Database className="w-5 h-5 mx-auto" />
+                            <span className="text-[10px] font-bold block mt-1">CSV</span>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-500">N/A</span>
+                        )}
+                      </td>
                       
                       <td className="py-4 text-center">
                         {aiLoading ? (
@@ -243,7 +261,7 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       
-                      {/* THE FIX: Red Lock icon and UNLOCK text */}
+                    
                       <td className="py-4 text-right pr-2">
                         <button 
                           onClick={handleAdminOverride}

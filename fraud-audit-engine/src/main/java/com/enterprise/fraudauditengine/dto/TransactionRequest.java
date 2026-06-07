@@ -5,8 +5,8 @@ public class TransactionRequest {
     private double amount;
     private String merchantCategory;
     private String location;
+    private boolean isBatch; // The new property to prevent velocity misfires
 
-    // Getters and Setters
     public String getAccountId() { return accountId; }
     public void setAccountId(String accountId) { this.accountId = accountId; }
 
@@ -18,4 +18,7 @@ public class TransactionRequest {
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
+
+    public boolean isBatch() { return isBatch; }
+    public void setBatch(boolean batch) { isBatch = batch; }
 }
