@@ -37,7 +37,7 @@ spring:
         enabled: true
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 csv:
   aliases:
@@ -52,8 +52,8 @@ gemini:
     max-retries: 2
 
 aws:
-  access-key-id: "d11168ef5ec192e69778c2437670b829"
-  secret-access-key: "f67d14249d1d73d32197ed4484792d27f54db271f20b2f687fb7bb2527582168"
+  access-key-id: ${R2_ACCESS_KEY}
+  secret-access-key: ${R2_SECRET_KEY}
   region: "auto"
   s3:
     endpoint: "https://759dc11839520cb62fadf1d4b9863b29.r2.cloudflarestorage.com"
