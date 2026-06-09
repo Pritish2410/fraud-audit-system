@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database } from 'lucide-react'
+import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2, Download } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+
 
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState({
@@ -9,16 +10,20 @@ export default function AdminDashboard() {
     sync: '100.0% Sync'
   })
 
-  // Persistent State
   const [accountState, setAccountState] = useState(() => localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
   const [evidenceFile, setEvidenceFile] = useState(() => localStorage.getItem('WAYNE_ENT_EVIDENCE_FILE') || null)
   const [aiReport, setAiReport] = useState(() => localStorage.getItem('WAYNE_ENT_REPORT') || "Awaiting velocity event triggers...")
   const [aiLoading, setAiLoading] = useState(false)
 
-  // Helper to check if the AI is still typing based on all possible backend placeholders
+  const [threats, setThreats] = useState([]);
+  
+  const [agents, setAgents] = useState([])
+  const [usersList, setUsersList] = useState([])
+
+  const activeOperativesCount = usersList.filter(user => user.status === 'ONLINE').length;
+
   const isStillBrewing = (text) => text.includes("Awaiting") || text.includes("Generating") || text.includes("System locked") || text.includes("analyzing");
 
-  // Sync state across tabs
   useEffect(() => {
     const handleStorage = () => {
       setAccountState(localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
@@ -36,7 +41,23 @@ export default function AdminDashboard() {
     localStorage.setItem('WAYNE_ENT_REPORT', aiReport)
   }, [aiReport])
 
-  // Mock metrics
+  // Fetch Agents & Users from Neon DB
+  // Fetch Users with a 3-second live sync interval
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const usersRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users`)
+        if (usersRes.ok) setUsersList(await usersRes.json())
+      } catch (err) {
+        console.error("Data sync failed", err)
+      }
+    }
+    
+    fetchData() 
+    const syncInterval = setInterval(fetchData, 3000) 
+    return () => clearInterval(syncInterval)
+  }, [])
+
   useEffect(() => {
     const interval = setInterval(() => {
       const isActive = Math.random() > 0.3
@@ -48,21 +69,25 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Async Polling
-  // Async Polling
   const pollForReport = () => {
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/audit/report`)
-        const json = await res.json()
+        const rawText = await res.text()
         
-        // THE FIX: Check against our bulletproof helper function
-        if (!isStillBrewing(json.report)) {
-          setAiReport(json.report)
+        let finalReport = rawText
+        try {
+          finalReport = JSON.parse(rawText).report || rawText
+        } catch (parseErr) {}
+        
+        if (!isStillBrewing(finalReport)) {
+          setAiReport(finalReport)
           clearInterval(pollInterval) 
           setAiLoading(false)
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("AI Report Polling Error:", err)
+      }
     }, 2000) 
 
     setTimeout(() => {
@@ -85,63 +110,178 @@ export default function AdminDashboard() {
     localStorage.setItem('WAYNE_ENT_REPORT', "Awaiting velocity event triggers...")
   }
 
-  const downloadPremiumPDF = () => {
-    if (isStillBrewing(aiReport)) return;
+  const handleDeregisterUser = async (id) => {
+    if (!window.confirm("CRITICAL WARNING: This will permanently wipe the operative from the system. Proceed?")) return;
     
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setUsersList(usersList.filter(user => user.id !== id));
+      }
+    } catch (err) {
+      console.error("Wipe command failed", err);
+    }
+  }
+
+  const downloadUsersPDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const maxLineWidth = pageWidth - margin * 2;
-    let cursorY = 30;
-
-    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     const drawPremiumTheme = () => {
+      // Dark slate background
       doc.setFillColor(15, 23, 42); 
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      doc.setFillColor(225, 29, 72); 
-      doc.rect(0, 0, pageWidth, 20, 'F');
+      // Purple header strip
+      doc.setFillColor(147, 51, 234); 
+      doc.rect(0, 0, pageWidth, 25, 'F');
+      
+      // Title
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      doc.text(`WAYNE ENTERPRISES - FORENSIC REPORT (${currentDate})`, 10, 14);
+      doc.text("WAYNE ENTERPRISES - CLASSIFIED OPERATIVE DOSSIER", 10, 16);
+      
+      // Timestamp
+      doc.setFontSize(9);
+      doc.setTextColor(200, 200, 200);
+      doc.text(`SYSTEM GENERATED: ${currentDate}`, 10, 32);
+      
+      // Grid Headers
+      doc.setFontSize(11);
+      doc.setTextColor(147, 51, 234);
+      doc.text("SYS ID", 10, 45);
+      doc.text("OPERATIVE ALIAS", 40, 45);
+      doc.text("SECURE COMM LINK", 120, 45);
+      
+      // Header Line
+      doc.setDrawColor(147, 51, 234);
+      doc.setLineWidth(0.5);
+      doc.line(10, 48, pageWidth - 10, 48);
     };
 
     drawPremiumTheme();
-    let cleanText = aiReport.replace(/\*\*/g, ''); 
-    const lines = cleanText.split('\n');
-
-    lines.forEach(line => {
-      if (line.trim() === '') { cursorY += 4; return; }
-      if (cursorY > pageHeight - 20) { doc.addPage(); drawPremiumTheme(); cursorY = 30; }
-      
-      if (line.startsWith('# ') || line.startsWith('## ')) {
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-        doc.text(line.replace(/#/g, '').trim(), margin, cursorY);
-        cursorY += 8; 
-      } else if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-        doc.setTextColor(226, 232, 240);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-        const splitBullet = doc.splitTextToSize(line.replace(/^[\s*-]+/, '\u2022  '), maxLineWidth - 5);
-        doc.text(splitBullet, margin + 5, cursorY);
-        cursorY += (splitBullet.length * 5) + 3;
-      } else {
-        doc.setTextColor(226, 232, 240);
-        doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-        const splitText = doc.splitTextToSize(line, maxLineWidth);
-        doc.text(splitText, margin, cursorY, { align: 'justify', maxWidth: maxLineWidth });
-        cursorY += (splitText.length * 5) + 4;
+    
+    let cursorY = 56;
+    doc.setFont("helvetica", "normal");
+    
+    usersList.forEach((user, index) => {
+      if (cursorY > pageHeight - 20) {
+        doc.addPage();
+        drawPremiumTheme();
+        cursorY = 56;
       }
+      
+      // Alternating row colors for ultimate readability
+      if (index % 2 === 0) {
+        doc.setFillColor(30, 41, 59);
+        doc.rect(10, cursorY - 5, pageWidth - 20, 8, 'F');
+      }
+
+      doc.setTextColor(148, 163, 184); // Slate 400
+      doc.setFontSize(10);
+      
+      doc.text(`OP-${user.id.toString().padStart(4, '0')}`, 12, cursorY);
+      doc.setTextColor(255, 255, 255); // White for name
+      doc.text(user.name, 42, cursorY);
+      doc.setTextColor(148, 163, 184); // Back to Slate
+      doc.text(user.email, 122, cursorY);
+      
+      cursorY += 10;
     });
-    doc.save(`Forensic_Report_WAYNE_ENT_001.pdf`);
+
+    // Confidential Footer
+    doc.setTextColor(225, 29, 72); // Rose Red
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("*** LEVEL 1 EYES ONLY - DESTROY AFTER REVIEW ***", pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+    doc.save(`Operative_Directory_${new Date().getTime()}.pdf`);
   }
+  const downloadIndividualPDF = (user) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // Premium Dark Theme Background
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    // Top Accent Security Header Banner
+    doc.setFillColor(147, 51, 234); 
+    doc.rect(0, 0, pageWidth, 25, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("WAYNE ENTERPRISES - INDIVIDUAL DOSSIER", 10, 16);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Generated: ${currentDate}`, 10, 35);
+    
+    // Core Credentials Section
+    doc.setTextColor(255, 255, 255);
+    doc.text(`System ID: OP-${user.id.toString().padStart(4, '0')}`, 10, 50);
+    doc.text(`Operative Name: ${user.name}`, 10, 60);
+    doc.text(`Secure Comm Link: ${user.email}`, 10, 70);
+
+    // Dynamic Expanded intelligence Fields
+    doc.text(`Age: ${user.age}`, 10, 85);
+    doc.text(`Sex: ${user.sex}`, 10, 95);
+    doc.text(`Date of Birth: ${user.dob}`, 10, 105);
+    doc.text(`Primary Residence: ${user.residence}`, 10, 115);
+
+    // Footer Security Classification
+    doc.setTextColor(225, 29, 72); 
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("*** LEVEL 1 EYES ONLY - DESTROY AFTER REVIEW ***", pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+    doc.save(`Operative_${user.name.replace(/\s+/g, '_')}_Details.pdf`);
+  }
+
+  const downloadPremiumPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Dark slate background
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    
+    // Blue header strip
+    doc.setFillColor(59, 130, 246); 
+    doc.rect(0, 0, pageWidth, 25, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("WAYNE ENTERPRISES - FORENSIC AI REPORT", 10, 16);
+    
+    // Body Text (The actual AI Gemini Report)
+    doc.setFontSize(11);
+    doc.setTextColor(148, 163, 184); // Slate 400
+    const splitText = doc.splitTextToSize(aiReport || "No active threat report available.", pageWidth - 20);
+    doc.text(splitText, 10, 40);
+
+    // Confidential Footer
+    doc.setTextColor(225, 29, 72);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("*** LEVEL 1 EYES ONLY ***", pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+    doc.save(`AI_Forensics_${new Date().getTime()}.pdf`);
+  }
+
+  const activeAgentsCount = agents.filter(a => a.status === 'ACTIVE').length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
       
-      {/* GLOBAL ACCOUNT STATUS & ISSUES COUNTER */}
       <div className={`p-6 rounded-2xl mb-8 flex items-center justify-between border backdrop-blur-2xl transition-all duration-500 ${
         accountState === 'ACTIVE' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
         'bg-rose-950/60 border-rose-500/70 text-rose-400 shadow-[0_0_50px_rgba(225,29,72,0.4)]'
@@ -154,12 +294,6 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold text-white drop-shadow-md">Global Network Status: {accountState}</h3>
             <p className="text-sm font-medium mt-1">{accountState === 'BLOCKED' ? 'CRITICAL: Threat detected. Awaiting Admin manual review.' : 'All nodes secure. Monitoring active.'}</p>
           </div>
-          
-          <div className={`px-5 py-2 font-bold rounded-lg border transition-all uppercase tracking-widest ${
-            accountState === 'BLOCKED' ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.4)]' : 'bg-emerald-500/10 text-emerald-500/50 border-emerald-500/20'
-          }`}>
-            Active Issues: {accountState === 'BLOCKED' ? '1' : '0'}
-          </div>
         </div>
       </div>
 
@@ -167,7 +301,10 @@ export default function AdminDashboard() {
         {[
           { label: 'Upstash Throughput', value: metrics.throughput, icon: Activity, color: 'text-blue-400 bg-blue-500/20 border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]' },
           { label: 'Cloud Latency', value: metrics.latency, icon: ShieldAlert, color: 'text-rose-400 bg-rose-500/20 border-rose-500/50 shadow-[0_0_25px_rgba(225,29,72,0.3)]' },
-          { label: 'Authorized Agents', value: '1 Active', icon: Users, color: 'text-purple-400 bg-purple-500/20 border-purple-500/50 shadow-[0_0_25px_rgba(168,85,247,0.3)]' },
+          
+          // THIS IS YOUR NEW DYNAMIC METRIC
+          { label: 'Active Operatives', value: `${activeOperativesCount} Online`, icon: Users, color: 'text-purple-400 bg-purple-500/20 border-purple-500/50 shadow-[0_0_25px_rgba(168,85,247,0.3)]' },
+          
           { label: 'Pub/Sub Pipeline', value: metrics.sync, icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.3)]' },
         ].map((stat, i) => (
           <div key={i} className="p-6 rounded-2xl bg-slate-900/60 border border-white/20 backdrop-blur-2xl flex items-center justify-between shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
@@ -204,11 +341,17 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        <div className="lg:col-span-3">
-          <div className="p-8 rounded-3xl bg-slate-900/60 border border-white/20 backdrop-blur-3xl h-full shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
+        <div className="lg:col-span-3 space-y-8">
+          
+          {/* ISOLATED NODE DIRECTORY */}
+          <div className="p-8 rounded-3xl bg-slate-900/60 border border-white/20 backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
             <h3 className="text-xl font-bold text-white border-b border-white/20 pb-5 mb-6 flex items-center justify-between">
               <span>Isolated Node Directory</span>
-              <span className="text-xs font-bold text-rose-300 bg-rose-900/40 px-3 py-1.5 rounded-lg border border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.3)]">Admin Override Required</span>
+              {threats && threats.length > 0 && (
+                <div className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold uppercase tracking-wider">
+                  Admin Override Required
+                </div>
+              )}
             </h3>
 
             <div className="overflow-x-auto">
@@ -226,9 +369,15 @@ export default function AdminDashboard() {
                 <tbody>
                   {accountState === 'BLOCKED' ? (
                     <tr className="border-b border-white/5 bg-white/5 transition-colors">
-                      <td className="py-4 px-2 font-mono text-sm text-slate-300">WAYNE_ENT_001</td>
-                      <td className="py-4 px-2 font-medium text-white">Wayne Enterprises</td>
-                      <td className="py-4 px-2 text-sm text-slate-400">admin@wayneenterprises.com</td>
+                      <td className="py-4 px-2 font-mono text-sm text-slate-300">
+                        OP-{usersList.find(u => u.email === localStorage.getItem('WAYNE_ENT_BLOCKED_USER'))?.id?.toString().padStart(4, '0') || '0000'}
+                      </td>
+                      <td className="py-4 px-2 font-medium text-white">
+                        {usersList.find(u => u.email === localStorage.getItem('WAYNE_ENT_BLOCKED_USER'))?.name || 'Unknown Operative'}
+                      </td>
+                      <td className="py-4 px-2 text-sm text-slate-400">
+                        {localStorage.getItem('WAYNE_ENT_BLOCKED_USER') || 'unknown@operative.com'}
+                      </td>
 
                       <td className="py-4 text-center">
                         {evidenceFile ? (
@@ -261,7 +410,6 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       
-                    
                       <td className="py-4 text-right pr-2">
                         <button 
                           onClick={handleAdminOverride}
@@ -274,8 +422,75 @@ export default function AdminDashboard() {
                     </tr>
                   ) : (
                     <tr>
-                      <td colSpan="5" className="py-16 text-center text-slate-500 text-sm font-bold tracking-widest uppercase">
+                      <td colSpan="6" className="py-16 text-center text-slate-500 text-sm font-bold tracking-widest uppercase">
                         No active network threats
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* NEW: GLOBAL OPERATIVE DIRECTORY */}
+          <div className="p-8 rounded-3xl bg-slate-900/60 border border-white/20 backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/20 pb-5 mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                <Users className="w-6 h-6 text-indigo-400" />
+                Global Operative Directory
+              </h3>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-900/90 backdrop-blur-md z-10">
+                  <tr className="border-b border-white/10 text-xs text-slate-400 uppercase tracking-widest">
+                    <th className="pb-4 font-bold">Sys ID</th>
+                    <th className="pb-4 font-bold">Operative Name</th>
+                    <th className="pb-4 font-bold">Comm Link</th>
+                    <th className="pb-4 font-bold text-center">Status</th>
+                    <th className="pb-4 font-bold text-center">User Details</th>
+                    <th className="pb-4 font-bold text-right">Sanitize</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersList.length > 0 ? usersList.map((user) => (
+                    <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                      <td className="py-4 px-2 font-mono text-xs text-slate-500 group-hover:text-slate-300">OP-{user.id.toString().padStart(4, '0')}</td>
+                      <td className="py-4 px-2 font-bold text-white">{user.name}</td>
+                      <td className="py-4 px-2 text-sm text-slate-400">{user.email}</td>
+                      <td className="py-4 px-2 text-center">
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          user.status === 'ONLINE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 
+                          user.status === 'OFFLINE' ? 'bg-slate-500/20 text-slate-500 border border-slate-500/50' : 
+                          'bg-rose-500/20 text-rose-400 border border-rose-500/50'
+                        }`}>
+                          {user.status || 'UNKNOWN'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-2 text-center">
+                        <button 
+                          onClick={() => downloadIndividualPDF(user)}
+                          className="px-3 py-1 bg-purple-600/20 text-purple-400 hover:bg-purple-500/30 border border-purple-500/50 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all mx-auto block active:scale-95"
+                          title="Download User Details"
+                        >
+                          User Details
+                        </button>
+                      </td>
+                      <td className="py-4 text-right pr-2">
+                        <button 
+                          onClick={() => handleDeregisterUser(user.id)}
+                          className="p-2 rounded-lg text-rose-500/50 hover:text-rose-400 hover:bg-rose-500/10 transition-all active:scale-90 ml-auto block"
+                          title="Wipe Operative Data"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="6" className="py-10 text-center text-slate-500 text-sm font-bold tracking-widest uppercase">
+                        No operatives detected in database
                       </td>
                     </tr>
                   )}

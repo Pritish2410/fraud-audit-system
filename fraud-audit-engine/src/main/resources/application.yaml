@@ -20,7 +20,21 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   ai:
+    retry:
+      max-attempts: 1
     openai:
       api-key: ${GEMINI_API_KEY}
       base-url: https://generativelanguage.googleapis.com/v1beta/openai
@@ -38,6 +52,11 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+security:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY:defaultSecretKeyThatIsAtLeast32BytesLongForHS256Algorithm}
+    expiration-time: 86400000
 
 csv:
   aliases:

@@ -31,6 +31,7 @@ public class FraudAuditService {
         return latestReport;
     }
 
+    @Async
     public void generateBatchReport(int totalProcessed, int totalIsolated) {
         if (System.currentTimeMillis() < circuitOpenUntil) {
             long remainingSecs = (circuitOpenUntil - System.currentTimeMillis()) / 1000;
@@ -51,10 +52,12 @@ public class FraudAuditService {
             this.latestReport = chatClient.prompt().user(batchPrompt).call().content();
             consecutiveFailures.set(0); 
         } catch (Exception e) {
+            System.err.println("Gemini API Error in Batch Report:");
+            e.printStackTrace(); // Logs the error silently in terminal
             handleApiFailure(e);
             this.latestReport = "## BATCH ANALYSIS COMPLETE\n\n* Total Processed: " + totalProcessed + 
                                 "\n* Anomalies Detected: " + totalIsolated + 
-                                "\n\n*(Note: AI summary offline due to API rate limits.)*";
+                                "\n\n*(Note: AI summary offline due to API rate limits. Showing raw data instead.)*";
         }
     }
 
@@ -79,6 +82,8 @@ public class FraudAuditService {
             this.latestReport = chatClient.prompt().user(prompt).call().content();
             consecutiveFailures.set(0); 
         } catch (Exception e) {
+            System.err.println("Gemini API Error in Individual Audit:");
+            e.printStackTrace(); // Logs the error silently in terminal
             handleApiFailure(e);
             this.latestReport = "## SYSTEM ERROR: FORENSIC ENGINE OFFLINE\n\n" +
                                 "**Error Code:** 429/503 (API Limit or High Demand)\n\n" +
