@@ -69,39 +69,38 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  const pollForReport = () => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/audit/report`)
-        const rawText = await res.text()
-        
-        let finalReport = rawText
-        try {
-          finalReport = JSON.parse(rawText).report || rawText
-        } catch (parseErr) {}
-        
-        if (!isStillBrewing(finalReport)) {
-          setAiReport(finalReport)
-          clearInterval(pollInterval) 
-          setAiLoading(false)
-        }
-      } catch (err) {
-        console.error("AI Report Polling Error:", err)
-      }
-    }, 2000) 
-
-    setTimeout(() => {
-      clearInterval(pollInterval)
-      setAiLoading(false)
-    }, 20000)
-  }
-
   useEffect(() => {
+    let pollInterval;
+    
     if (accountState === 'BLOCKED' && isStillBrewing(aiReport)) {
-      setAiLoading(true)
-      pollForReport()
+      setAiLoading(true);
+      
+      const executePoll = async () => {
+        try {
+          const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/audit/report`);
+          const rawText = await res.text();
+          let finalReport = rawText;
+          
+          try { 
+            finalReport = JSON.parse(rawText).report || rawText; 
+          } catch (e) {}
+
+          if (!isStillBrewing(finalReport)) {
+            setAiReport(finalReport);
+            setAiLoading(false);
+            clearInterval(pollInterval);
+          }
+        } catch (err) {
+          console.error("Polling sync error:", err);
+        }
+      };
+
+      executePoll(); // Run immediately on block trigger
+      pollInterval = setInterval(executePoll, 2000);
     }
-  }, [])
+
+    return () => clearInterval(pollInterval);
+  }, [accountState, aiReport]);
 
   const handleAdminOverride = () => {
     setAccountState('ACTIVE')

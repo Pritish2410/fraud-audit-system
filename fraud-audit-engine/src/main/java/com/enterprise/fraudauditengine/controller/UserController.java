@@ -62,4 +62,16 @@ public class UserController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PutMapping("/email/{email}/details")
+    public ResponseEntity<?> updateUserDetails(@PathVariable String email, @RequestBody Map<String, Object> updates) {
+        return userRepository.findByEmail(email).map(user -> {
+            if (updates.containsKey("age") && !updates.get("age").toString().isEmpty()) user.setAge(Integer.parseInt(updates.get("age").toString()));
+            if (updates.containsKey("sex")) user.setSex(updates.get("sex").toString());
+            if (updates.containsKey("dob")) user.setDob(updates.get("dob").toString());
+            if (updates.containsKey("residence")) user.setResidence(updates.get("residence").toString());
+            userRepository.save(user);
+            return ResponseEntity.ok(Map.of("message", "Operative intelligence updated."));
+        }).orElse(ResponseEntity.badRequest().body(Map.of("error", "User not found.")));
+    }
 }

@@ -50,9 +50,34 @@ function Layout({ children }) {
     }
   };
 
-  const handleUpdateInfo = () => {
-    alert("Update Info module coming in Phase 1, Step 3!"); // We will build this next
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updateData, setUpdateData] = useState({ 
+    age: '', 
+    sex: '', 
+    dob: '', 
+    residence: '' 
+  });
+
+  const handleUpdateSubmit = async (e) => {
+    e.preventDefault();
+    const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/email/${email}/details`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+      if (res.ok) {
+        setIsUpdateModalOpen(false);
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error("Failed to transmit intelligence telemetry:", err);
+    }
   };
+
+  // Replace your static handleUpdateInfo placeholder
+  const handleUpdateInfo = () => setIsUpdateModalOpen(true);
 
   return (
     <div className="min-h-screen font-sans text-slate-200 relative z-0 overflow-x-hidden selection:bg-purple-500/30">
@@ -123,6 +148,41 @@ function Layout({ children }) {
           )}
         </div>
       </nav>
+
+      {isUpdateModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="bg-slate-900 border border-purple-500/30 p-6 rounded-2xl max-w-md w-full shadow-[0_20px_60px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-150">
+            <h2 className="text-xl font-bold text-white mb-4 tracking-wide border-b border-white/10 pb-2">Update Classified Intelligence</h2>
+            <form onSubmit={handleUpdateSubmit} className="space-y-4 text-slate-300">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Current Age</label>
+                <input required type="number" value={updateData.age} onChange={e => setUpdateData({...updateData, age: e.target.value})} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-purple-500 transition-colors font-medium" placeholder="Specify age..." />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Gender Designation</label>
+                <select required value={updateData.sex} onChange={e => setUpdateData({...updateData, sex: e.target.value})} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-purple-500 transition-colors font-medium appearance-none">
+                  <option value="" disabled>Select gender...</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Classified">Classified</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Chronological Date of Birth</label>
+                <input required type="date" value={updateData.dob} onChange={e => setUpdateData({...updateData, dob: e.target.value})} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-purple-500 [color-scheme:dark] transition-colors font-medium" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Primary Node Residence Location</label>
+                <input required type="text" value={updateData.residence} onChange={e => setUpdateData({...updateData, residence: e.target.value})} className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none focus:border-purple-500 transition-colors font-medium" placeholder="City, Country..." />
+              </div>
+              <div className="flex gap-3 mt-6 pt-2">
+                <button type="button" onClick={() => setIsUpdateModalOpen(false)} className="flex-1 p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold transition-colors uppercase text-xs tracking-wider">Cancel</button>
+                <button type="submit" className="flex-1 p-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold shadow-lg shadow-purple-500/20 transition-colors uppercase text-xs tracking-wider">Save Target Profile</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <main className="relative z-10">
         {children}

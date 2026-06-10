@@ -35,16 +35,18 @@ public class FraudAuditService {
     public void generateBatchReport(int totalProcessed, int totalIsolated) {
         if (System.currentTimeMillis() < circuitOpenUntil) {
             long remainingSecs = (circuitOpenUntil - System.currentTimeMillis()) / 1000;
-            this.latestReport = "## BATCH ANALYSIS COMPLETE\n\n* Total Processed: " + totalProcessed + 
-                                "\n* Anomalies Detected: " + totalIsolated + 
-                                "\n\n*(Note: AI offline. Circuit breaker open for " + remainingSecs + " more seconds)*";
+            this.latestReport = "BATCH ANALYSIS COMPLETE\n\n• Total Processed: " + totalProcessed + 
+                                "\n• Anomalies Detected: " + totalIsolated + 
+                                "\n\n(Note: AI offline. Circuit breaker open for " + remainingSecs + " seconds)";
             return;
         }
 
         String batchPrompt = String.format(
-            "You are a Lead Forensic Auditor. Write a brief executive summary report for a batch data analysis. " +
-            "Use markdown headings: '## BATCH SUMMARY', '## METRICS', '## RECOMMENDATION'. " +
-            "Use bullet points. Data: Processed %d total transactions. Isolated %d high-risk anomalies.", 
+            "You are a Lead Forensic Auditor. Write a highly detailed executive summary report for a batch data analysis. " +
+            "CRITICAL FORMATTING RULES: Output strictly in PLAIN TEXT. DO NOT use markdown. No asterisks, no hashes, no bold tags. " +
+            "Use EXACTLY these ALL CAPS headers on their own lines, separated by double spacing: 'BATCH SUMMARY', 'METRICS', 'RECOMMENDATIONS'. " +
+            "Under each header, use the bullet point symbol (•) followed by a space for each detailed point. Do not add extra blank lines between bullet points. " +
+            "Data: Processed %d total transactions. Isolated %d high-risk anomalies. Explain the implications of this anomaly rate.", 
             totalProcessed, totalIsolated
         );
         
@@ -53,28 +55,30 @@ public class FraudAuditService {
             consecutiveFailures.set(0); 
         } catch (Exception e) {
             System.err.println("Gemini API Error in Batch Report:");
-            e.printStackTrace(); // Logs the error silently in terminal
+            e.printStackTrace(); 
             handleApiFailure(e);
-            this.latestReport = "## BATCH ANALYSIS COMPLETE\n\n* Total Processed: " + totalProcessed + 
-                                "\n* Anomalies Detected: " + totalIsolated + 
-                                "\n\n*(Note: AI summary offline due to API rate limits. Showing raw data instead.)*";
+            this.latestReport = "BATCH ANALYSIS COMPLETE\n\n• Total Processed: " + totalProcessed + 
+                                "\n• Anomalies Detected: " + totalIsolated + 
+                                "\n\n(Note: AI summary offline due to API rate limits. Showing raw data instead.)";
         }
     }
 
     @Async
     public void executeAiAudit(TransactionRequest request) {
         if (System.currentTimeMillis() < circuitOpenUntil) {
-            this.latestReport = "## SYSTEM LOCKED\n\n*(AI offline. Circuit breaker actively preventing API calls)*";
+            this.latestReport = "SYSTEM LOCKED\n\n(AI offline. Circuit breaker actively preventing API calls)";
             return;
         }
 
         this.latestReport = "System locked. Gemini AI analyzing threat vectors...";
 
         String prompt = String.format(
-            "You are a senior financial forensic analyst explaining a threat to a beginner analyst. " +
+            "You are a senior financial forensic analyst writing a formal, detailed incident report. " +
             "An isolation protocol fired for account '%s'. " +
             "Anomaly: A charge of $%.2f was attempted at a '%s' merchant, originating from IP location: '%s'. " +
-            "RULES: Use markdown headings: '## EXECUTIVE SUMMARY', '## THREAT INDICATORS', '## EXPLOITATION VECTORS', '## RECOMMENDED ACTIONS'.",
+            "CRITICAL FORMATTING RULES: Output strictly in PLAIN TEXT. DO NOT use markdown. No asterisks, no hashes, no bold tags. " +
+            "Use EXACTLY these ALL CAPS headers on their own lines, separated by double spacing: 'EXECUTIVE SUMMARY', 'THREAT INDICATORS', 'EXPLOITATION VECTORS', 'RECOMMENDED ACTIONS'. " +
+            "Under each header, use the bullet point symbol (•) followed by a space for each detailed point. Do not add extra blank lines between bullet points.",
             request.getAccountId(), request.getAmount(), request.getMerchantCategory(), request.getLocation()
         );
 
@@ -83,11 +87,11 @@ public class FraudAuditService {
             consecutiveFailures.set(0); 
         } catch (Exception e) {
             System.err.println("Gemini API Error in Individual Audit:");
-            e.printStackTrace(); // Logs the error silently in terminal
+            e.printStackTrace(); 
             handleApiFailure(e);
-            this.latestReport = "## SYSTEM ERROR: FORENSIC ENGINE OFFLINE\n\n" +
-                                "**Error Code:** 429/503 (API Limit or High Demand)\n\n" +
-                                "* Threat isolated, but AI report generation failed. Circuit Breaker activated.";
+            this.latestReport = "SYSTEM ERROR: FORENSIC ENGINE OFFLINE\n\n" +
+                                "Error Code: 429/503 (API Limit or High Demand)\n\n" +
+                                "• Threat isolated, but AI report generation failed. Circuit Breaker activated.";
         }
     }
 
