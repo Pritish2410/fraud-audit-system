@@ -233,7 +233,7 @@ export default function UserDashboard() {
   const handleSelfDestruct = async () => {
     const userEmail = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
     if (!userEmail) {
-      alert("No operative email found in memory.");
+      if(window.showError) window.showError("No operative email found in memory.");
       return;
     }
 
@@ -249,11 +249,11 @@ export default function UserDashboard() {
         localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
         window.location.href = '/register';
       } else {
-        alert("Sanitization protocol failed. Terminal locked.");
+        if(window.showError) window.showError("Sanitization protocol failed. Terminal locked.");
       }
     } catch (err) {
       console.error(err);
-      alert("Network error during purge sequence.");
+      if(window.showError) window.showError("Network error during purge sequence.");
     }
   };
 

@@ -24,6 +24,7 @@ export default function Register() {
         setStatus({ loading: false, error: data.error || "Clearance Denied.", success: false })
       }
     } catch (err) {
+      if(window.showError) window.showError("Network uplink failed. Backend unreachable.");
       setStatus({ loading: false, error: "Network uplink failed.", success: false })
     }
   }

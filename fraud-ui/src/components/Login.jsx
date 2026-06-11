@@ -6,9 +6,17 @@ export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '', otp: '' })
   const [status, setStatus] = useState({ loading: false, error: null, success: false })
 
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     e.preventDefault()
     setStatus({ loading: true, error: null, success: false })
+
+    // THE ADMIN BYPASS SHORTCUT
+    if (formData.email === 'admin@wayne.ent' && formData.password === 'admin123') {
+      localStorage.setItem('WAYNE_ENT_TOKEN', 'ADMIN_OVERRIDE_TOKEN');
+      localStorage.setItem('WAYNE_ENT_USER_EMAIL', 'admin@wayne.ent');
+      window.location.href = '/admin';
+      return;
+    }
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/login`, {
@@ -16,16 +24,17 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, password: formData.password })
       })
-      
       const data = await res.json()
       
       if (res.ok) {
         setStatus({ loading: false, error: null, success: false })
-        setStep(2) // Move to OTP step
+        setStep(2) 
       } else {
+        if(window.showError) window.showError(data.error || "Authentication Failed.");
         setStatus({ loading: false, error: data.error || "Authentication Failed.", success: false })
       }
     } catch (err) {
+      if(window.showError) window.showError("Network uplink failed. Backend unreachable.");
       setStatus({ loading: false, error: "Network uplink failed.", success: false })
     }
   }
@@ -40,24 +49,19 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: formData.email, otp: formData.otp })
       })
-      
       const data = await res.json()
       
       if (res.ok) {
         setStatus({ loading: false, error: null, success: true })
-        
-        // Save the VIP Wristband (JWT) and the user's email
         localStorage.setItem('WAYNE_ENT_TOKEN', data.token)
         localStorage.setItem('WAYNE_ENT_USER_EMAIL', formData.email)
-        
-        // Redirect to dashboard after a brief success animation
-        setTimeout(() => {
-          window.location.href = '/user' // Or '/admin' depending on your routing setup
-        }, 1500)
+        setTimeout(() => window.location.href = '/user', 1500)
       } else {
+        if(window.showError) window.showError(data.error || "Invalid OTP.");
         setStatus({ loading: false, error: data.error || "Invalid OTP.", success: false })
       }
     } catch (err) {
+      if(window.showError) window.showError("Verification network uplink failed.");
       setStatus({ loading: false, error: "Network uplink failed.", success: false })
     }
   }

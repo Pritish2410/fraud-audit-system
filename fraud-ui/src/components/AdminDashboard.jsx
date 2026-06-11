@@ -48,7 +48,7 @@ export default function AdminDashboard() {
         const usersRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users`)
         if (usersRes.ok) setUsersList(await usersRes.json())
       } catch (err) {
-        console.error("Data sync failed", err)
+        if(window.showError) window.showError("Data sync failed. Check database connection.");
       }
     }
     
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
         setUsersList(usersList.filter(user => user.id !== id));
       }
     } catch (err) {
-      console.error("Wipe command failed", err);
+      if(window.showError) window.showError("Wipe command failed.");
     }
   }
 
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
         setUsersList(usersList.map(user => user.id === id ? { ...user, status: 'OFFLINE' } : user));
       }
     } catch (err) {
-      console.error("Approval failed", err);
+      if(window.showError) window.showError("Operative approval ping failed.");
     }
   }
 
