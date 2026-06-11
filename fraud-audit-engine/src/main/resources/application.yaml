@@ -22,15 +22,15 @@ spring:
 
   
   mail:
-    host: smtp.resend.com
-    port: 465
-    username: resend
+    host: smtp-relay.brevo.com
+    port: 587
+    username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
-          ssl:
+          starttls:
             enable: true
 
   ai:
@@ -82,5 +82,5 @@ aws:
 app:
   mail:
     sender:
-      address: "onboarding@resend.dev"
+      address: "pritishsahoo24october2003@gmail.com"
       name: "Wayne Enterprises"
