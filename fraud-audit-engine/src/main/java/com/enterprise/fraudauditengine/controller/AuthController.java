@@ -76,6 +76,10 @@ public class AuthController {
 
         User user = userOpt.get();
 
+        if ("PENDING".equals(user.getStatus())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Clearance Pending: Your account is awaiting Admin approval."));
+        }
+
         String otp = String.format("%06d", new Random().nextInt(999999));
         
         user.setOtp(otp, LocalDateTime.now().plusMinutes(10));

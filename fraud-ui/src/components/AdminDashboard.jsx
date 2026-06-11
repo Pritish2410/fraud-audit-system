@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2, Download } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
-
 export default function AdminDashboard() {
   const [metrics, setMetrics] = useState({
     throughput: '0 ops/sec',
@@ -119,6 +118,17 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error("Wipe command failed", err);
+    }
+  }
+
+  const handleApproveUser = async (id) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/${id}/approve`, { method: 'PUT' });
+      if (res.ok) {
+        setUsersList(usersList.map(user => user.id === id ? { ...user, status: 'OFFLINE' } : user));
+      }
+    } catch (err) {
+      console.error("Approval failed", err);
     }
   }
 
@@ -247,31 +257,61 @@ export default function AdminDashboard() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Dark slate background
-    doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    // Helper function to draw the theme on every new page
+    const drawPremiumTheme = (pageNumber) => {
+      // Dark slate background
+      doc.setFillColor(15, 23, 42); 
+      doc.rect(0, 0, pageWidth, pageHeight, 'F');
+      
+      // Blue header strip
+      doc.setFillColor(59, 130, 246); 
+      doc.rect(0, 0, pageWidth, 25, 'F');
+      
+      // Title
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("WAYNE ENTERPRISES - FORENSIC AI REPORT", 10, 16);
+
+      // Confidential Footer with Dynamic Page Number
+      doc.setTextColor(225, 29, 72);
+      doc.setFontSize(10);
+      doc.text(`*** LEVEL 1 EYES ONLY - PAGE ${pageNumber} ***`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    };
+
+    let currentPage = 1;
+    drawPremiumTheme(currentPage);
     
-    // Blue header strip
-    doc.setFillColor(59, 130, 246); 
-    doc.rect(0, 0, pageWidth, 25, 'F');
-    
-    // Title
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("WAYNE ENTERPRISES - FORENSIC AI REPORT", 10, 16);
-    
-    // Body Text (The actual AI Gemini Report)
+    // Body Text Settings
     doc.setFontSize(11);
     doc.setTextColor(148, 163, 184); // Slate 400
-    const splitText = doc.splitTextToSize(aiReport || "No active threat report available.", pageWidth - 20);
-    doc.text(splitText, 10, 40);
+    doc.setFont("helvetica", "normal");
 
-    // Confidential Footer
-    doc.setTextColor(225, 29, 72);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("*** LEVEL 1 EYES ONLY ***", pageWidth / 2, pageHeight - 10, { align: 'center' });
+    // Split the text to fit the width of the page
+    const splitText = doc.splitTextToSize(aiReport || "No active threat report available.", pageWidth - 20);
+    
+    let cursorY = 40; // Starting Y position below the header
+    const lineHeight = 6; // Standard line height jump
+
+    // Iterate through every single line of the text
+    splitText.forEach(line => {
+      // If the next line is going to hit the footer, create a new page!
+      if (cursorY + lineHeight > pageHeight - 20) { 
+        doc.addPage();
+        currentPage++;
+        drawPremiumTheme(currentPage);
+        
+        // Reset text settings just in case the new page wiped them
+        doc.setFontSize(11);
+        doc.setTextColor(148, 163, 184); 
+        doc.setFont("helvetica", "normal");
+        
+        cursorY = 40; // Reset cursor back to the top of the new page
+      }
+      
+      doc.text(line, 10, cursorY);
+      cursorY += lineHeight;
+    });
 
     doc.save(`AI_Forensics_${new Date().getTime()}.pdf`);
   }
@@ -301,7 +341,6 @@ export default function AdminDashboard() {
           { label: 'Upstash Throughput', value: metrics.throughput, icon: Activity, color: 'text-blue-400 bg-blue-500/20 border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]' },
           { label: 'Cloud Latency', value: metrics.latency, icon: ShieldAlert, color: 'text-rose-400 bg-rose-500/20 border-rose-500/50 shadow-[0_0_25px_rgba(225,29,72,0.3)]' },
           
-          // THIS IS YOUR NEW DYNAMIC METRIC
           { label: 'Active Operatives', value: `${activeOperativesCount} Online`, icon: Users, color: 'text-purple-400 bg-purple-500/20 border-purple-500/50 shadow-[0_0_25px_rgba(168,85,247,0.3)]' },
           
           { label: 'Pub/Sub Pipeline', value: metrics.sync, icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.3)]' },
@@ -461,6 +500,7 @@ export default function AdminDashboard() {
                       <td className="py-4 px-2 text-center">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           user.status === 'ONLINE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 
+                          user.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' :
                           user.status === 'OFFLINE' ? 'bg-slate-500/20 text-slate-500 border border-slate-500/50' : 
                           'bg-rose-500/20 text-rose-400 border border-rose-500/50'
                         }`}>
@@ -476,10 +516,19 @@ export default function AdminDashboard() {
                           User Details
                         </button>
                       </td>
-                      <td className="py-4 text-right pr-2">
+                      <td className="py-4 text-right pr-2 flex items-center justify-end gap-2">
+                        {user.status === 'PENDING' && (
+                          <button 
+                            onClick={() => handleApproveUser(user.id)}
+                            className="p-2 rounded-lg text-emerald-500/70 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all active:scale-90"
+                            title="Approve Clearance"
+                          >
+                            <CheckCircle className="w-5 h-5" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleDeregisterUser(user.id)}
-                          className="p-2 rounded-lg text-rose-500/50 hover:text-rose-400 hover:bg-rose-500/10 transition-all active:scale-90 ml-auto block"
+                          className="p-2 rounded-lg text-rose-500/50 hover:text-rose-400 hover:bg-rose-500/10 transition-all active:scale-90"
                           title="Wipe Operative Data"
                         >
                           <Trash2 className="w-5 h-5" />

@@ -31,15 +31,15 @@ export default function Register() {
   if (status.success) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1)_0,transparent_50%)] animate-pulse" />
-        <div className="p-8 rounded-3xl bg-slate-900/60 border border-emerald-500/30 backdrop-blur-3xl shadow-[0_0_50px_rgba(16,185,129,0.2)] text-center relative z-10 max-w-md w-full">
-          <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.5)]">
-            <Fingerprint className="w-10 h-10 text-emerald-400" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.1)_0,transparent_50%)] animate-pulse" />
+        <div className="p-8 rounded-3xl bg-slate-900/60 border border-amber-500/30 backdrop-blur-3xl shadow-[0_0_50px_rgba(245,158,11,0.2)] text-center relative z-10 max-w-md w-full">
+          <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.5)]">
+            <Shield className="w-10 h-10 text-amber-400" />
           </div>
-          <h2 className="text-2xl font-black text-white mb-2 tracking-wider">CLEARANCE GRANTED</h2>
-          <p className="text-slate-400 font-medium mb-8">Identity registered in the master node. Proceed to the authentication terminal to receive your security OTP.</p>
-          <button onClick={() => window.location.href='/login'} className="w-full py-4 bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 rounded-xl font-bold tracking-widest transition-all">
-            INITIALIZE LOGIN
+          <h2 className="text-2xl font-black text-white mb-2 tracking-wider">CLEARANCE PENDING</h2>
+          <p className="text-slate-400 font-medium mb-8">Identity registered in the master node. Awaiting manual Admin verification. You will receive an encrypted comms ping (email) once cleared to generate your OTP.</p>
+          <button onClick={() => window.location.href='/login'} className="w-full py-4 bg-amber-600/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50 rounded-xl font-bold tracking-widest transition-all">
+            RETURN TO LOGIN
           </button>
         </div>
       </div>

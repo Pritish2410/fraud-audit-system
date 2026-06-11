@@ -103,8 +103,12 @@ public class DatasetController {
             // SMART ARCHIVE
             if (anomalies > 0) {
                 try (FileInputStream s3Stream = new FileInputStream(tempFile)) {
+                    System.out.println("=> [VAULT] Attempting to archive " + (tempFile.length() / 1024 / 1024) + "MB evidence file to R2...");
                     storageService.uploadDataset(file.getOriginalFilename(), s3Stream, tempFile.length());
-                    System.out.println("=> [VAULT] Anomaly detected! Evidence securely archived to Cloudflare.");
+                    System.out.println("=> [VAULT] Evidence securely archived to Cloudflare.");
+                } catch (Exception e) {
+                    System.err.println("=> [VAULT WARNING] Cloudflare R2 Upload Failed (Timeout/Size Limit): " + e.getMessage());
+                    // We catch the error so the analysis still returns SUCCESS to the frontend!
                 }
             } else {
                 System.out.println("=> [VAULT] Dataset clean. Discarding file to save storage limits.");

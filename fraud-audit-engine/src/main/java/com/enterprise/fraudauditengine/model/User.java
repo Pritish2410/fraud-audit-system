@@ -22,7 +22,7 @@ public class User {
     private String password; 
 
     @Column(name = "status")
-    private String status = "OFFLINE";
+    private String status = "PENDING";
 
     private String role = "ROLE_ADMIN";
 

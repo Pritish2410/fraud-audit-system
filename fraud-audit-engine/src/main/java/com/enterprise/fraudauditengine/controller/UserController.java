@@ -7,15 +7,29 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
+
 @RestController
 @RequestMapping("/api/v1/users")
 @CrossOrigin(origins = {"http://localhost:5173", "https://fraud-audit-dashboard.vercel.app"})
 public class UserController {
 
     private final UserRepository userRepository;
+    private final com.enterprise.fraudauditengine.service.EmailService emailService;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, com.enterprise.fraudauditengine.service.EmailService emailService) {
         this.userRepository = userRepository;
+        this.emailService = emailService;
+    }
+
+    @PutMapping("/{id}/approve")
+    public ResponseEntity<?> approveUser(@PathVariable Long id) {
+        return userRepository.findById(id).map(user -> {
+            user.setStatus("OFFLINE"); // "OFFLINE" means cleared to login
+            userRepository.save(user);
+            emailService.sendAccessGrantedEmail(user.getEmail());
+            return ResponseEntity.ok(Map.of("message", "Operative cleared."));
+        }).orElse(ResponseEntity.badRequest().body(Map.of("error", "Operative not found.")));
     }
 
     // Admin God-Eye View: Fetches all users with full parameters safely
