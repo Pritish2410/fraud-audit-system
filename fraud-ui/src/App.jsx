@@ -27,7 +27,7 @@ function Layout({ children }) {
     
     const handleUnload = () => {
       const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
-      if (email) {
+      if (email && email !== 'admin@wayne.ent') {
         navigator.sendBeacon(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/logout/${email}`);
       }
     };
@@ -43,7 +43,7 @@ function Layout({ children }) {
 
   const handleSignOut = async () => {
     const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL')
-    if (email) {
+    if (email && email !== 'admin@wayne.ent') {
       try {
         await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/auth/logout/${email}`, { method: 'POST' })
       } catch (err) {

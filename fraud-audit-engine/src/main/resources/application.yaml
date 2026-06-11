@@ -20,16 +20,17 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME}
+    host: smtp.resend.com
+    port: 465
+    username: resend
     password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
-          starttls:
+          ssl:
             enable: true
 
   ai:
@@ -77,3 +78,9 @@ aws:
   s3:
     endpoint: "https://759dc11839520cb62fadf1d4b9863b29.r2.cloudflarestorage.com"
     bucket-name: "fraud-vault"
+
+app:
+  mail:
+    sender:
+      address: "onboarding@resend.dev"
+      name: "Wayne Enterprises"
