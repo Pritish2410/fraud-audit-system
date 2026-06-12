@@ -17,13 +17,11 @@ export default function AdminDashboard() {
 
   const activeOperativesCount = usersList.filter(user => user.status === 'ONLINE').length;
   
-  // DYNAMIC EVIDENCE FETCHING: Instead of reading localStorage, we pull the exact file linked to the blocked user from the server
   const blockedUser = usersList.find(user => user.status === 'BLOCKED');
   const dynamicEvidenceFile = blockedUser?.evidence || null;
 
   const isStillBrewing = (text) => text.includes("Awaiting") || text.includes("Generating") || text.includes("System locked") || text.includes("analyzing");
 
-  // TRUE GLOBAL SYNC: Admin Dashboard derives its lock state entirely from the Database stream
   useEffect(() => {
     if (usersList.some(user => user.status === 'BLOCKED')) {
       setAccountState('BLOCKED');
@@ -62,10 +60,11 @@ export default function AdminDashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // FIXED POLLING LOOP: Completely decoupled from aiReport updates so it doesn't stutter or crash
   useEffect(() => {
     let pollInterval;
     
-    if (accountState === 'BLOCKED' && isStillBrewing(aiReport)) {
+    if (accountState === 'BLOCKED') {
       setAiLoading(true);
       
       const executePoll = async () => {
@@ -78,8 +77,10 @@ export default function AdminDashboard() {
             finalReport = JSON.parse(rawText).report || rawText; 
           } catch (e) {}
 
+          // Ensure the UI updates with the chunking/brewing text
+          setAiReport(finalReport);
+
           if (!isStillBrewing(finalReport)) {
-            setAiReport(finalReport);
             setAiLoading(false);
             clearInterval(pollInterval);
           }
@@ -90,17 +91,16 @@ export default function AdminDashboard() {
 
       executePoll(); 
       pollInterval = setInterval(executePoll, 2000);
+    } else {
+      // Reset text when unlocked
+      setAiReport("Awaiting velocity event triggers...");
+      setAiLoading(false);
     }
 
     return () => clearInterval(pollInterval);
-  }, [accountState, aiReport]);
+  }, [accountState]); // 'aiReport' is completely removed from dependencies here
 
   const handleAdminOverride = async () => {
-    setAccountState('ACTIVE')
-    setAiReport("Awaiting velocity event triggers...")
-    localStorage.setItem('WAYNE_ENT_REPORT', "Awaiting velocity event triggers...")
-
-    // Global Central Release Broadcast
     try {
       await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/global-unlock`, {
         method: 'POST'
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* METRICS GRID - SLEEK SQUARE ON MOBILE, CLASSIC ROW ON DESKTOP */}
+      {/* METRICS GRID */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         {[
           { label: 'Upstash Throughput', value: metrics.throughput, icon: Activity, color: 'text-blue-400 bg-blue-500/20 border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]' },
@@ -313,7 +313,7 @@ export default function AdminDashboard() {
                       </td>
 
                       <td className="py-4 text-center">
-                        {dynamicEvidenceFile ? (
+                        {dynamicEvidenceFile && dynamicEvidenceFile !== 'unknown_evidence.csv' ? (
                           <a 
                             href={`${import.meta.env.VITE_API_BASE_URL}/api/v1/datasets/download/${dynamicEvidenceFile}`}
                             download

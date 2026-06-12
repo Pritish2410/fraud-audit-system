@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -18,8 +17,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final com.enterprise.fraudauditengine.service.EmailService emailService;
 
-    // IN-MEMORY SECURITY STATES: Decouples the session status from the security blocklist
-    private final Set<String> blockedEmails = ConcurrentHashMap.newKeySet();
+    // DYNAMIC EVIDENCE MAP: Links the exact CSV file to the specific user securely in memory
     private final Map<String, String> userEvidenceFiles = new ConcurrentHashMap<>();
 
     public UserController(UserRepository userRepository, com.enterprise.fraudauditengine.service.EmailService emailService) {
@@ -46,9 +44,8 @@ public class UserController {
                     userMap.put("name", u.getName());
                     userMap.put("email", u.getEmail());
                     
-                    // ENFORCE BLOCKLIST OVERRIDE
-                    String realStatus = blockedEmails.contains(u.getEmail()) ? "BLOCKED" : (u.getStatus() != null ? u.getStatus() : "OFFLINE");
-                    userMap.put("status", realStatus);
+                    // DATABASE IS GOD: Direct read from PostgreSQL
+                    userMap.put("status", u.getStatus() != null ? u.getStatus() : "OFFLINE");
                     
                     // ATTACH LIVE EVIDENCE FILE
                     userMap.put("evidence", userEvidenceFiles.getOrDefault(u.getEmail(), null));
@@ -62,11 +59,21 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
+    // ==========================================
+    // BULLETPROOF SYNCHRONIZATION ENDPOINTS
+    // ==========================================
+
     @PostMapping("/lockdown")
-    public ResponseEntity<?> triggerLockdown(@RequestParam String email, @RequestParam(required = false) String evidence) {
-        // Securely map the evidence file to the user on the server
-        blockedEmails.add(email);
-        if (evidence != null && !evidence.isEmpty()) {
+    public ResponseEntity<?> triggerLockdown(@RequestBody Map<String, String> payload) {
+        // STRICT JSON PAYLOAD: Guarantees Render firewall will not drop the POST request
+        String email = payload.get("email");
+        String evidence = payload.get("evidence");
+
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email required"));
+        }
+
+        if (evidence != null && !evidence.trim().isEmpty()) {
             userEvidenceFiles.put(email, evidence);
         }
         
@@ -79,8 +86,7 @@ public class UserController {
 
     @PostMapping("/global-unlock")
     public ResponseEntity<?> globalUnlock() {
-        // Wipe the security blocklist and destroy the file maps
-        blockedEmails.clear();
+        // Destroy the file maps on global unlock to prevent stale cache
         userEvidenceFiles.clear();
         
         List<Object> unlockedCount = userRepository.findAll().stream()
@@ -100,8 +106,8 @@ public class UserController {
     @PutMapping("/email/{email}/status")
     public ResponseEntity<?> updateStatus(@PathVariable String email, @RequestParam String status) {
         return userRepository.findByEmail(email).map(user -> {
-            // Prevent users from bypassing a block by logging in/out
-            if (blockedEmails.contains(email)) {
+            // IMMUTABLE SECURITY CHECK: Prevent users from bypassing a block by logging in/out
+            if ("BLOCKED".equals(user.getStatus())) {
                 return ResponseEntity.ok(Map.of("message", "Status change rejected. Operative is locked."));
             }
             user.setStatus(status);
@@ -110,10 +116,11 @@ public class UserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // ==========================================
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deregisterUser(@PathVariable Long id) {
         return userRepository.findById(id).map(u -> {
-            blockedEmails.remove(u.getEmail());
             userEvidenceFiles.remove(u.getEmail());
             userRepository.deleteById(id);
             return ResponseEntity.ok(Map.of("message", "Operative data wiped."));
@@ -123,7 +130,6 @@ public class UserController {
     @DeleteMapping("/email/{email}")
     public ResponseEntity<?> deregisterSelf(@PathVariable String email) {
         return userRepository.findByEmail(email).map(user -> {
-            blockedEmails.remove(email);
             userEvidenceFiles.remove(email);
             userRepository.delete(user);
             return ResponseEntity.ok(Map.of("message", "Your data has been permanently wiped from the system."));
@@ -138,9 +144,8 @@ public class UserController {
             userMap.put("name", u.getName());
             userMap.put("email", u.getEmail());
             
-            // Enforce live blocklist reading
-            String realStatus = blockedEmails.contains(u.getEmail()) ? "BLOCKED" : (u.getStatus() != null ? u.getStatus() : "OFFLINE");
-            userMap.put("status", realStatus);
+            // Database is God
+            userMap.put("status", u.getStatus() != null ? u.getStatus() : "OFFLINE");
             return ResponseEntity.ok(userMap);
         }).orElse(ResponseEntity.notFound().build());
     }

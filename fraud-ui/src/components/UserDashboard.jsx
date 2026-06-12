@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { CreditCard, Send, ShieldX, Flame } from 'lucide-react'
 
 export default function UserDashboard() {
-  const [accountState, setAccountState] = useState(() => localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
+  const [accountState, setAccountState] = useState('ACTIVE')
   const [csvFile, setCsvFile] = useState(null)
   const [realCsvData, setRealCsvData] = useState([]) 
   
@@ -31,7 +31,7 @@ export default function UserDashboard() {
     }
   }, []);
   
-  // LIVE DATABASE HEARTBEAT
+  // LIVE DATABASE HEARTBEAT: LocalStorage strictly removed to prevent dual-tab festival lights conflict
   useEffect(() => {
     const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL')
     if (!email) return
@@ -47,13 +47,11 @@ export default function UserDashboard() {
         const data = await res.json()
         setFirstName(data.name ? data.name.split(' ')[0] : 'Operative')
         
-        // GLOBAL SYNC: Override local state with live database truth
+        // GLOBAL SYNC: Only trust the database response
         if (data.status === 'BLOCKED') {
           setAccountState('BLOCKED')
-          localStorage.setItem('WAYNE_ENT_STATUS', 'BLOCKED')
         } else {
           setAccountState('ACTIVE')
-          localStorage.setItem('WAYNE_ENT_STATUS', 'ACTIVE')
         }
       } catch (err) {
         console.error("Heartbeat sync link degraded:", err)
@@ -64,12 +62,6 @@ export default function UserDashboard() {
     const heartbeat = setInterval(fetchUserAndCheckHeartbeat, 3000)
 
     return () => clearInterval(heartbeat)
-  }, [])
-
-  useEffect(() => {
-    const handleStorage = () => setAccountState(localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
   }, [])
 
   const handleFileSelection = (e) => {
@@ -175,16 +167,21 @@ export default function UserDashboard() {
 
   const executeLockdown = async () => {
     setAccountState('BLOCKED')
-    localStorage.setItem('WAYNE_ENT_STATUS', 'BLOCKED')
+    
+    // We still keep the report storage locally so the dashboard knows to show Gemini loading
     localStorage.setItem('WAYNE_ENT_REPORT', "Generating Gemini Forensic Report...")
     localStorage.setItem('WAYNE_ENT_BLOCKED_USER', localStorage.getItem('WAYNE_ENT_USER_EMAIL'))
 
-    // Central Database Broadcast Trigger WITH Dynamic File Name
+    // JSON BODY BROADCAST: Guarantees Render doesn't drop the network request
     const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL')
-    const fileName = csvFile ? encodeURIComponent(csvFile.name) : 'unknown_evidence.csv';
+    const fileName = csvFile ? csvFile.name : 'unknown_evidence.csv';
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/lockdown?email=${email}&evidence=${fileName}`, {
-        method: 'POST'
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/lockdown`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email, evidence: fileName })
       })
     } catch (err) {
       console.error("Failed to broadcast system isolation:", err)
