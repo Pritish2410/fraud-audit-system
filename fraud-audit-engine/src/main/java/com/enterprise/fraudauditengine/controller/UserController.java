@@ -4,10 +4,9 @@ import com.enterprise.fraudauditengine.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -50,6 +49,38 @@ public class UserController {
                 })
                 .collect(Collectors.toList()));
     }
+
+    // ==========================================
+    // CROSS-DEVICE SYNCHRONIZATION ENDPOINTS
+    // ==========================================
+
+    @PostMapping("/lockdown")
+    public ResponseEntity<?> triggerLockdown(@RequestParam String email) {
+        return userRepository.findByEmail(email).map(user -> {
+            user.setStatus("BLOCKED");
+            userRepository.save(user);
+            return ResponseEntity.ok(Map.of("message", "Node isolated. Global lockdown engaged."));
+        }).orElse(ResponseEntity.badRequest().body(Map.of("error", "Operative not found.")));
+    }
+
+    @PostMapping("/global-unlock")
+    public ResponseEntity<?> globalUnlock() {
+        // Fetch all users currently marked as BLOCKED and reset them
+        List<Object> unlockedCount = userRepository.findAll().stream()
+            .filter(u -> "BLOCKED".equals(u.getStatus()))
+            .map(u -> {
+                u.setStatus("ONLINE");
+                userRepository.save(u);
+                return u;
+            }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Global override accepted. All nodes unlocked.",
+            "nodesRestored", unlockedCount.size()
+        ));
+    }
+
+    // ==========================================
 
     // Admin Wipe: Deletes a specific user by their database ID
     @DeleteMapping("/{id}")

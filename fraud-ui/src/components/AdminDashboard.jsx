@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2, Download } from 'lucide-react'
+import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2, Download, LogOut } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 export default function AdminDashboard() {
@@ -101,11 +101,20 @@ export default function AdminDashboard() {
     return () => clearInterval(pollInterval);
   }, [accountState, aiReport]);
 
-  const handleAdminOverride = () => {
+  const handleAdminOverride = async () => {
     setAccountState('ACTIVE')
     setAiReport("Awaiting velocity event triggers...")
     localStorage.setItem('WAYNE_ENT_STATUS', 'ACTIVE')
     localStorage.setItem('WAYNE_ENT_REPORT', "Awaiting velocity event triggers...")
+
+    // Global Central Release Broadcast
+    try {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/global-unlock`, {
+        method: 'POST'
+      })
+    } catch (err) {
+      if(window.showError) window.showError("Global unlock broadcast failed.");
+    }
   }
 
   const handleDeregisterUser = async (id) => {
@@ -131,6 +140,12 @@ export default function AdminDashboard() {
       if(window.showError) window.showError("Operative approval ping failed.");
     }
   }
+
+  const handleSignOut = () => {
+    localStorage.removeItem('WAYNE_ENT_TOKEN');
+    localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
+    window.location.href = '/login';
+  };
 
   const downloadUsersPDF = () => {
     const doc = new jsPDF();
@@ -208,6 +223,7 @@ export default function AdminDashboard() {
 
     doc.save(`Operative_Directory_${new Date().getTime()}.pdf`);
   }
+
   const downloadIndividualPDF = (user) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -321,22 +337,30 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
       
+      {/* MOBILE SECURE SIGN-OUT ATTACHED DIRECTLY TO THE HEADER BAR */}
       <div className={`p-6 rounded-2xl mb-8 flex items-center justify-between border backdrop-blur-2xl transition-all duration-500 ${
         accountState === 'ACTIVE' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
         'bg-rose-950/60 border-rose-500/70 text-rose-400 shadow-[0_0_50px_rgba(225,29,72,0.4)]'
       }`}>
-        <div className="flex items-center gap-5 w-full">
-          <div className={`p-4 rounded-xl shadow-inner ${accountState === 'BLOCKED' ? 'bg-rose-500/30' : 'bg-emerald-500/30'}`}>
-            {accountState === 'BLOCKED' ? <ShieldX className="w-8 h-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" /> : <CreditCard className="w-8 h-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" />}
+        <div className="flex items-center gap-4 sm:gap-5 w-full">
+          <div className={`p-3 sm:p-4 rounded-xl shadow-inner ${accountState === 'BLOCKED' ? 'bg-rose-500/30' : 'bg-emerald-500/30'}`}>
+            {accountState === 'BLOCKED' ? <ShieldX className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" /> : <CreditCard className="w-6 h-6 sm:w-8 sm:h-8 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]" />}
           </div>
           <div className="flex-grow">
-            <h3 className="text-xl font-bold text-white drop-shadow-md">Global Network Status: {accountState}</h3>
-            <p className="text-sm font-medium mt-1">{accountState === 'BLOCKED' ? 'CRITICAL: Threat detected. Awaiting Admin manual review.' : 'All nodes secure. Monitoring active.'}</p>
+            <h3 className="text-sm sm:text-xl font-bold text-white drop-shadow-md">Global Network Status: {accountState}</h3>
+            <p className="text-[10px] sm:text-sm font-medium mt-1">{accountState === 'BLOCKED' ? 'CRITICAL: Threat detected. Awaiting Admin manual review.' : 'All nodes secure. Monitoring active.'}</p>
           </div>
         </div>
+        <button 
+          onClick={handleSignOut} 
+          className="ml-2 sm:ml-4 p-3 bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-800/40 rounded-xl transition-all active:scale-95 flex items-center justify-center cursor-pointer" 
+          title="Terminate Admin Session">
+          <LogOut className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      {/* SLEEK SQUARE 2x2 GRID CONVERSION FOR MOBILE DEVICE VIEWPORT MAPS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         {[
           { label: 'Upstash Throughput', value: metrics.throughput, icon: Activity, color: 'text-blue-400 bg-blue-500/20 border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]' },
           { label: 'Cloud Latency', value: metrics.latency, icon: ShieldAlert, color: 'text-rose-400 bg-rose-500/20 border-rose-500/50 shadow-[0_0_25px_rgba(225,29,72,0.3)]' },
@@ -345,13 +369,13 @@ export default function AdminDashboard() {
           
           { label: 'Pub/Sub Pipeline', value: metrics.sync, icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.3)]' },
         ].map((stat, i) => (
-          <div key={i} className="p-6 rounded-2xl bg-slate-900/60 border border-white/20 backdrop-blur-2xl flex items-center justify-between shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-white/20 backdrop-blur-2xl flex flex-col justify-between aspect-square lg:aspect-auto shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
             <div>
-              <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{stat.label}</span>
-              <h3 className="text-2xl font-black text-white mt-2 drop-shadow-lg">{stat.value}</h3>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-widest block truncate">{stat.label}</span>
+              <h3 className="text-lg sm:text-2xl font-black text-white mt-1 sm:mt-2 drop-shadow-lg tracking-tight">{stat.value}</h3>
             </div>
-            <div className={`p-4 rounded-xl border ${stat.color}`}>
-              <stat.icon className="w-6 h-6 drop-shadow-[0_0_8px_currentColor]" />
+            <div className={`p-2 sm:p-4 rounded-xl border w-max self-end sm:self-auto mt-2 sm:mt-0 ${stat.color}`}>
+              <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_0_8px_currentColor]" />
             </div>
           </div>
         ))}
@@ -396,12 +420,12 @@ export default function AdminDashboard() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 text-xs text-slate-400 uppercase tracking-widest">
-                    <th className="pb-4 font-bold">User ID</th>
-                    <th className="pb-4 font-bold">Account Name</th>
-                    <th className="pb-4 font-bold">Email</th>
+                    <th className="pb-4 font-bold min-w-[80px]">User ID</th>
+                    <th className="pb-4 font-bold min-w-[120px]">Account Name</th>
+                    <th className="pb-4 font-bold min-w-[150px]">Email</th>
                     <th className="pb-4 font-bold text-center">Evidence</th>
                     <th className="pb-4 font-bold text-center">AI Report</th>
-                    <th className="pb-4 font-bold text-right">Action</th>
+                    <th className="pb-4 font-bold text-right min-w-[100px]">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -413,7 +437,7 @@ export default function AdminDashboard() {
                       <td className="py-4 px-2 font-medium text-white">
                         {usersList.find(u => u.email === localStorage.getItem('WAYNE_ENT_BLOCKED_USER'))?.name || 'Unknown Operative'}
                       </td>
-                      <td className="py-4 px-2 text-sm text-slate-400">
+                      <td className="py-4 px-2 text-sm text-slate-400 truncate max-w-[200px]">
                         {localStorage.getItem('WAYNE_ENT_BLOCKED_USER') || 'unknown@operative.com'}
                       </td>
 
@@ -426,7 +450,7 @@ export default function AdminDashboard() {
                             title={`Download dataset: ${evidenceFile}`}
                           >
                             <Database className="w-5 h-5 mx-auto" />
-                            <span className="text-[10px] font-bold block mt-1">CSV</span>
+                            <span className="text-[10px] font-bold block mt-1 uppercase tracking-wider text-slate-400">File</span>
                           </a>
                         ) : (
                           <span className="text-xs text-slate-500">N/A</span>
@@ -470,7 +494,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* NEW: GLOBAL OPERATIVE DIRECTORY */}
+          {/* GLOBAL OPERATIVE DIRECTORY */}
           <div className="p-8 rounded-3xl bg-slate-900/60 border border-white/20 backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
             <div className="flex items-center justify-between border-b border-white/20 pb-5 mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-3">
@@ -483,12 +507,12 @@ export default function AdminDashboard() {
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-900/90 backdrop-blur-md z-10">
                   <tr className="border-b border-white/10 text-xs text-slate-400 uppercase tracking-widest">
-                    <th className="pb-4 font-bold">Sys ID</th>
-                    <th className="pb-4 font-bold">Operative Name</th>
-                    <th className="pb-4 font-bold">Comm Link</th>
+                    <th className="pb-4 font-bold min-w-[80px]">Sys ID</th>
+                    <th className="pb-4 font-bold min-w-[120px]">Operative Name</th>
+                    <th className="pb-4 font-bold min-w-[150px]">Comm Link</th>
                     <th className="pb-4 font-bold text-center">Status</th>
                     <th className="pb-4 font-bold text-center">User Details</th>
-                    <th className="pb-4 font-bold text-right">Sanitize</th>
+                    <th className="pb-4 font-bold text-right min-w-[80px]">Sanitize</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -496,7 +520,7 @@ export default function AdminDashboard() {
                     <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                       <td className="py-4 px-2 font-mono text-xs text-slate-500 group-hover:text-slate-300">OP-{user.id.toString().padStart(4, '0')}</td>
                       <td className="py-4 px-2 font-bold text-white">{user.name}</td>
-                      <td className="py-4 px-2 text-sm text-slate-400">{user.email}</td>
+                      <td className="py-4 px-2 text-sm text-slate-400 truncate max-w-[200px]">{user.email}</td>
                       <td className="py-4 px-2 text-center">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           user.status === 'ONLINE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 
