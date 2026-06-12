@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2, Download, LogOut } from 'lucide-react'
+import { Activity, ShieldAlert, Users, Terminal, CheckCircle, CreditCard, ShieldX, FileText, Loader2, Lock, Database, Trash2 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 export default function AdminDashboard() {
@@ -9,39 +9,27 @@ export default function AdminDashboard() {
     sync: '100.0% Sync'
   })
 
-  const [accountState, setAccountState] = useState(() => localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
+  const [accountState, setAccountState] = useState('ACTIVE')
   const [evidenceFile, setEvidenceFile] = useState(() => localStorage.getItem('WAYNE_ENT_EVIDENCE_FILE') || null)
   const [aiReport, setAiReport] = useState(() => localStorage.getItem('WAYNE_ENT_REPORT') || "Awaiting velocity event triggers...")
   const [aiLoading, setAiLoading] = useState(false)
 
-  const [threats, setThreats] = useState([]);
-  
-  const [agents, setAgents] = useState([])
   const [usersList, setUsersList] = useState([])
 
   const activeOperativesCount = usersList.filter(user => user.status === 'ONLINE').length;
+  const blockedUser = usersList.find(user => user.status === 'BLOCKED');
 
   const isStillBrewing = (text) => text.includes("Awaiting") || text.includes("Generating") || text.includes("System locked") || text.includes("analyzing");
 
+  // TRUE GLOBAL SYNC: Admin Dashboard now derives its lock state entirely from the Database
   useEffect(() => {
-    const handleStorage = () => {
-      setAccountState(localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
-      setAiReport(localStorage.getItem('WAYNE_ENT_REPORT') || "Awaiting velocity event triggers...")
+    if (usersList.some(user => user.status === 'BLOCKED')) {
+      setAccountState('BLOCKED');
+    } else {
+      setAccountState('ACTIVE');
     }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [])
+  }, [usersList]);
 
-  useEffect(() => {
-    localStorage.setItem('WAYNE_ENT_STATUS', accountState)
-  }, [accountState])
-
-  useEffect(() => {
-    localStorage.setItem('WAYNE_ENT_REPORT', aiReport)
-  }, [aiReport])
-
-  // Fetch Agents & Users from Neon DB
-  // Fetch Users with a 3-second live sync interval
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -94,7 +82,7 @@ export default function AdminDashboard() {
         }
       };
 
-      executePoll(); // Run immediately on block trigger
+      executePoll(); 
       pollInterval = setInterval(executePoll, 2000);
     }
 
@@ -104,7 +92,6 @@ export default function AdminDashboard() {
   const handleAdminOverride = async () => {
     setAccountState('ACTIVE')
     setAiReport("Awaiting velocity event triggers...")
-    localStorage.setItem('WAYNE_ENT_STATUS', 'ACTIVE')
     localStorage.setItem('WAYNE_ENT_REPORT', "Awaiting velocity event triggers...")
 
     // Global Central Release Broadcast
@@ -141,125 +128,31 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleSignOut = () => {
-    localStorage.removeItem('WAYNE_ENT_TOKEN');
-    localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
-    window.location.href = '/login';
-  };
-
-  const downloadUsersPDF = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-    const drawPremiumTheme = () => {
-      // Dark slate background
-      doc.setFillColor(15, 23, 42); 
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      // Purple header strip
-      doc.setFillColor(147, 51, 234); 
-      doc.rect(0, 0, pageWidth, 25, 'F');
-      
-      // Title
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.text("WAYNE ENTERPRISES - CLASSIFIED OPERATIVE DOSSIER", 10, 16);
-      
-      // Timestamp
-      doc.setFontSize(9);
-      doc.setTextColor(200, 200, 200);
-      doc.text(`SYSTEM GENERATED: ${currentDate}`, 10, 32);
-      
-      // Grid Headers
-      doc.setFontSize(11);
-      doc.setTextColor(147, 51, 234);
-      doc.text("SYS ID", 10, 45);
-      doc.text("OPERATIVE ALIAS", 40, 45);
-      doc.text("SECURE COMM LINK", 120, 45);
-      
-      // Header Line
-      doc.setDrawColor(147, 51, 234);
-      doc.setLineWidth(0.5);
-      doc.line(10, 48, pageWidth - 10, 48);
-    };
-
-    drawPremiumTheme();
-    
-    let cursorY = 56;
-    doc.setFont("helvetica", "normal");
-    
-    usersList.forEach((user, index) => {
-      if (cursorY > pageHeight - 20) {
-        doc.addPage();
-        drawPremiumTheme();
-        cursorY = 56;
-      }
-      
-      // Alternating row colors for ultimate readability
-      if (index % 2 === 0) {
-        doc.setFillColor(30, 41, 59);
-        doc.rect(10, cursorY - 5, pageWidth - 20, 8, 'F');
-      }
-
-      doc.setTextColor(148, 163, 184); // Slate 400
-      doc.setFontSize(10);
-      
-      doc.text(`OP-${user.id.toString().padStart(4, '0')}`, 12, cursorY);
-      doc.setTextColor(255, 255, 255); // White for name
-      doc.text(user.name, 42, cursorY);
-      doc.setTextColor(148, 163, 184); // Back to Slate
-      doc.text(user.email, 122, cursorY);
-      
-      cursorY += 10;
-    });
-
-    // Confidential Footer
-    doc.setTextColor(225, 29, 72); // Rose Red
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("*** LEVEL 1 EYES ONLY - DESTROY AFTER REVIEW ***", pageWidth / 2, pageHeight - 10, { align: 'center' });
-
-    doc.save(`Operative_Directory_${new Date().getTime()}.pdf`);
-  }
-
   const downloadIndividualPDF = (user) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    // Premium Dark Theme Background
     doc.setFillColor(15, 23, 42); 
     doc.rect(0, 0, pageWidth, pageHeight, 'F');
-    
-    // Top Accent Security Header Banner
     doc.setFillColor(147, 51, 234); 
     doc.rect(0, 0, pageWidth, 25, 'F');
-    
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text("WAYNE ENTERPRISES - INDIVIDUAL DOSSIER", 10, 16);
-    
     doc.setFontSize(12);
     doc.setTextColor(148, 163, 184);
     doc.text(`Generated: ${currentDate}`, 10, 35);
-    
-    // Core Credentials Section
     doc.setTextColor(255, 255, 255);
     doc.text(`System ID: OP-${user.id.toString().padStart(4, '0')}`, 10, 50);
     doc.text(`Operative Name: ${user.name}`, 10, 60);
     doc.text(`Secure Comm Link: ${user.email}`, 10, 70);
-
-    // Dynamic Expanded intelligence Fields
     doc.text(`Age: ${user.age}`, 10, 85);
     doc.text(`Sex: ${user.sex}`, 10, 95);
     doc.text(`Date of Birth: ${user.dob}`, 10, 105);
     doc.text(`Primary Residence: ${user.residence}`, 10, 115);
-
-    // Footer Security Classification
     doc.setTextColor(225, 29, 72); 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -273,23 +166,15 @@ export default function AdminDashboard() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Helper function to draw the theme on every new page
     const drawPremiumTheme = (pageNumber) => {
-      // Dark slate background
       doc.setFillColor(15, 23, 42); 
       doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      
-      // Blue header strip
       doc.setFillColor(59, 130, 246); 
       doc.rect(0, 0, pageWidth, 25, 'F');
-      
-      // Title
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text("WAYNE ENTERPRISES - FORENSIC AI REPORT", 10, 16);
-
-      // Confidential Footer with Dynamic Page Number
       doc.setTextColor(225, 29, 72);
       doc.setFontSize(10);
       doc.text(`*** LEVEL 1 EYES ONLY - PAGE ${pageNumber} ***`, pageWidth / 2, pageHeight - 10, { align: 'center' });
@@ -297,34 +182,24 @@ export default function AdminDashboard() {
 
     let currentPage = 1;
     drawPremiumTheme(currentPage);
-    
-    // Body Text Settings
     doc.setFontSize(11);
-    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.setTextColor(148, 163, 184); 
     doc.setFont("helvetica", "normal");
-
-    // Split the text to fit the width of the page
     const splitText = doc.splitTextToSize(aiReport || "No active threat report available.", pageWidth - 20);
     
-    let cursorY = 40; // Starting Y position below the header
-    const lineHeight = 6; // Standard line height jump
+    let cursorY = 40; 
+    const lineHeight = 6; 
 
-    // Iterate through every single line of the text
     splitText.forEach(line => {
-      // If the next line is going to hit the footer, create a new page!
       if (cursorY + lineHeight > pageHeight - 20) { 
         doc.addPage();
         currentPage++;
         drawPremiumTheme(currentPage);
-        
-        // Reset text settings just in case the new page wiped them
         doc.setFontSize(11);
         doc.setTextColor(148, 163, 184); 
         doc.setFont("helvetica", "normal");
-        
-        cursorY = 40; // Reset cursor back to the top of the new page
+        cursorY = 40; 
       }
-      
       doc.text(line, 10, cursorY);
       cursorY += lineHeight;
     });
@@ -332,12 +207,10 @@ export default function AdminDashboard() {
     doc.save(`AI_Forensics_${new Date().getTime()}.pdf`);
   }
 
-  const activeAgentsCount = agents.filter(a => a.status === 'ACTIVE').length;
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
       
-      {/* MOBILE SECURE SIGN-OUT ATTACHED DIRECTLY TO THE HEADER BAR */}
+      {/* GLOBAL STATUS BANNER */}
       <div className={`p-6 rounded-2xl mb-8 flex items-center justify-between border backdrop-blur-2xl transition-all duration-500 ${
         accountState === 'ACTIVE' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
         'bg-rose-950/60 border-rose-500/70 text-rose-400 shadow-[0_0_50px_rgba(225,29,72,0.4)]'
@@ -351,30 +224,22 @@ export default function AdminDashboard() {
             <p className="text-[10px] sm:text-sm font-medium mt-1">{accountState === 'BLOCKED' ? 'CRITICAL: Threat detected. Awaiting Admin manual review.' : 'All nodes secure. Monitoring active.'}</p>
           </div>
         </div>
-        <button 
-          onClick={handleSignOut} 
-          className="ml-2 sm:ml-4 p-3 bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-800/40 rounded-xl transition-all active:scale-95 flex items-center justify-center cursor-pointer" 
-          title="Terminate Admin Session">
-          <LogOut className="w-5 h-5 sm:w-6 sm:h-6" />
-        </button>
       </div>
 
-      {/* SLEEK SQUARE 2x2 GRID CONVERSION FOR MOBILE DEVICE VIEWPORT MAPS */}
+      {/* METRICS GRID - SLEEK SQUARE ON MOBILE, CLASSIC ROW ON DESKTOP */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
         {[
           { label: 'Upstash Throughput', value: metrics.throughput, icon: Activity, color: 'text-blue-400 bg-blue-500/20 border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]' },
           { label: 'Cloud Latency', value: metrics.latency, icon: ShieldAlert, color: 'text-rose-400 bg-rose-500/20 border-rose-500/50 shadow-[0_0_25px_rgba(225,29,72,0.3)]' },
-          
           { label: 'Active Operatives', value: `${activeOperativesCount} Online`, icon: Users, color: 'text-purple-400 bg-purple-500/20 border-purple-500/50 shadow-[0_0_25px_rgba(168,85,247,0.3)]' },
-          
           { label: 'Pub/Sub Pipeline', value: metrics.sync, icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.3)]' },
         ].map((stat, i) => (
-          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-white/20 backdrop-blur-2xl flex flex-col justify-between aspect-square lg:aspect-auto shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
-            <div>
+          <div key={i} className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-white/20 backdrop-blur-2xl flex flex-col sm:flex-row justify-between sm:items-center aspect-square sm:aspect-auto shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+            <div className="flex flex-col">
               <span className="text-[10px] sm:text-xs font-bold text-slate-300 uppercase tracking-widest block truncate">{stat.label}</span>
               <h3 className="text-lg sm:text-2xl font-black text-white mt-1 sm:mt-2 drop-shadow-lg tracking-tight">{stat.value}</h3>
             </div>
-            <div className={`p-2 sm:p-4 rounded-xl border w-max self-end sm:self-auto mt-2 sm:mt-0 ${stat.color}`}>
+            <div className={`p-2 sm:p-4 rounded-xl border w-max self-end sm:self-auto mt-auto sm:mt-0 ${stat.color}`}>
               <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_0_8px_currentColor]" />
             </div>
           </div>
@@ -409,7 +274,7 @@ export default function AdminDashboard() {
           <div className="p-8 rounded-3xl bg-slate-900/60 border border-white/20 backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden">
             <h3 className="text-xl font-bold text-white border-b border-white/20 pb-5 mb-6 flex items-center justify-between">
               <span>Isolated Node Directory</span>
-              {threats && threats.length > 0 && (
+              {accountState === 'BLOCKED' && (
                 <div className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold uppercase tracking-wider">
                   Admin Override Required
                 </div>
@@ -432,13 +297,13 @@ export default function AdminDashboard() {
                   {accountState === 'BLOCKED' ? (
                     <tr className="border-b border-white/5 bg-white/5 transition-colors">
                       <td className="py-4 px-2 font-mono text-sm text-slate-300">
-                        OP-{usersList.find(u => u.email === localStorage.getItem('WAYNE_ENT_BLOCKED_USER'))?.id?.toString().padStart(4, '0') || '0000'}
+                        OP-{blockedUser?.id?.toString().padStart(4, '0') || '0000'}
                       </td>
                       <td className="py-4 px-2 font-medium text-white">
-                        {usersList.find(u => u.email === localStorage.getItem('WAYNE_ENT_BLOCKED_USER'))?.name || 'Unknown Operative'}
+                        {blockedUser?.name || 'Unknown Operative'}
                       </td>
                       <td className="py-4 px-2 text-sm text-slate-400 truncate max-w-[200px]">
-                        {localStorage.getItem('WAYNE_ENT_BLOCKED_USER') || 'unknown@operative.com'}
+                        {blockedUser?.email || 'unknown@operative.com'}
                       </td>
 
                       <td className="py-4 text-center">

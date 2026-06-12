@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CreditCard, Send, ShieldX, LogOut, Flame } from 'lucide-react'
+import { CreditCard, Send, ShieldX, Flame } from 'lucide-react'
 
 export default function UserDashboard() {
   const [accountState, setAccountState] = useState(() => localStorage.getItem('WAYNE_ENT_STATUS') || 'ACTIVE')
@@ -21,7 +21,7 @@ export default function UserDashboard() {
 
   const [firstName, setFirstName] = useState('');
   
-  // Updated Heartbeat check & User Data Fetch
+  // LIVE DATABASE HEARTBEAT
   useEffect(() => {
     const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL')
     if (!email) return
@@ -37,7 +37,7 @@ export default function UserDashboard() {
         const data = await res.json()
         setFirstName(data.name ? data.name.split(' ')[0] : 'Operative')
         
-        // CENTRAL MAINMAIN SYNC: Override local storage state with live database truth
+        // GLOBAL SYNC: Override local state with live database truth
         if (data.status === 'BLOCKED') {
           setAccountState('BLOCKED')
           localStorage.setItem('WAYNE_ENT_STATUS', 'BLOCKED')
@@ -67,8 +67,6 @@ export default function UserDashboard() {
     setCsvFile(file);
     
     if (file) {
-      // If it is an Excel file, we bypass the frontend preview text stream
-      // since reading binary data as text will crash the browser.
       if (file.name.endsWith('.xlsx')) {
         setRealCsvData([
           "SYSTEM,INFO,0.00,0",
@@ -78,7 +76,6 @@ export default function UserDashboard() {
         return;
       }
 
-      // Standard CSV reading protocol
       const reader = new FileReader();
       reader.onload = (evt) => {
         const lines = evt.target.result.split('\n').filter(line => line.trim() !== '');
@@ -256,43 +253,9 @@ export default function UserDashboard() {
 
   const isErrorState = batchResults && batchResults.totalProcessed.toString().includes('ERROR');
 
-  const handleSignOut = () => {
-    localStorage.removeItem('WAYNE_ENT_TOKEN');
-    localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
-    window.location.href = '/login';
-  };
-
-  const handleSelfDestruct = async () => {
-    const userEmail = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
-    if (!userEmail) {
-      if(window.showError) window.showError("No operative email found in memory.");
-      return;
-    }
-
-    if (!window.confirm("WARNING: This will permanently purge your identity from the network. This action cannot be reversed. Proceed?")) return;
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/email/${userEmail}`, {
-        method: 'DELETE'
-      });
-
-      if (res.ok) {
-        localStorage.removeItem('WAYNE_ENT_TOKEN');
-        localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
-        window.location.href = '/register';
-      } else {
-        if(window.showError) window.showError("Sanitization protocol failed. Terminal locked.");
-      }
-    } catch (err) {
-      console.error(err);
-      if(window.showError) window.showError("Network error during purge sequence.");
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-12 relative z-10">
       
-      {/* RESPONSIVE LAYOUT FIX: Switch to flex-col on mobile screens, flex-row on desktop */}
       <div className={`p-6 rounded-2xl mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border backdrop-blur-2xl transition-all duration-500 ${
         accountState === 'ACTIVE' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]' :
         'bg-rose-950/60 border-rose-500/70 text-rose-400 shadow-[0_0_50px_rgba(225,29,72,0.4)]'
@@ -307,25 +270,18 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center w-full sm:w-auto sm:pr-4 justify-between sm:justify-end border-t border-slate-800/60 pt-4 sm:border-t-0 sm:pt-0">
-            <span className="text-3xl text-white/90 drop-shadow-md flex items-center gap-2">
-              
-              <svg className="w-24 h-12 transform translate-y-1 hidden sm:block" viewBox="-109 -9 2504 746" xmlns="http://www.w3.org/2000/svg">
+        {/* RESTORED MACBOOK SVG: Perfectly scaled for all devices and removed redundant logout button */}
+        <div className="flex items-center w-full sm:w-auto sm:pr-4 justify-center sm:justify-end border-t border-slate-800/60 pt-4 sm:border-t-0 sm:pt-0">
+            <span className="text-2xl sm:text-3xl text-white/90 drop-shadow-md flex items-center gap-2">
+              <svg className="w-16 h-8 sm:w-24 sm:h-12 transform translate-y-1" viewBox="-109 -9 2504 746" xmlns="http://www.w3.org/2000/svg">
                 <g transform="scale(1, -1) translate(0, -728)">
                   <path d="M-109.06069946289062,95.92639923095703 C1.9544999599456787,157.6403045654297 103.11389923095703,236.9969940185547 217.881103515625,372.07550048828125 C296,464.2846984863281 337.9999084472656,569.5725708007812 340,642.1939697265625 C341,696.1920166015625 314.6702880859375,737.156005859375 266,737.156005859375 C212,737.156005859375 178,696.1920166015625 157,602.1610107421875 C134,498.82000732421875 117,380.239990234375 74,0 " fill="none" stroke="#ffffff" strokeWidth="60" strokeLinecap="round"/>
                   <path d="M78.21453094482422,37.160953521728516 C100.22924041748047,230.68260192871094 184,372 291,372 C355,372 395.6745910644531,321 384.1253967285156,248 C377.6238098144531,205 370.0873107910156,161 361.3063049316406,110 C351.0714111328125,46 380.3254089355469,-4 468.96173095703125,-4 C598.2246704101562,-4 739.2435302734375,67.83381652832031 811.4124145507812,179.0941619873047 C836,217 846,251 847,284 C848,344 814,389 754,389 C678,389 620,303 620,193 C620,75 684,-8 819.9180908203125,-8 C1004.7244873046875,-8 1209.4246826171875,213.84754943847656 1303.4808349609375,461.42327880859375 C1330.037353515625,531.3258056640625 1340,596.2349243164062 1340,641.593994140625 C1340,695.3764038085938 1323,736.673583984375 1275,736.673583984375 C1228,736.673583984375 1197,700.1784057617188 1169,642.5543823242188 C1136.1939697265625,575.7216186523438 1111.927734375,479.32598876953125 1102,370.3599853515625 C1077,96.94000244140625 1133,-4 1266.152099609375,-4 C1427.6083984375,-4 1607.1151123046875,220.92921447753906 1698.771728515625,462.18878173828125 C1725.037353515625,531.3258056640625 1735,596.2349243164062 1735,641.593994140625 C1735,695.3764038085938 1718,736.673583984375 1670,736.673583984375 C1623,736.673583984375 1592,700.1784057617188 1564,642.5543823242188 C1531.1939697265625,575.7216186523438 1506.927734375,479.32598876953125 1497,370.3599853515625 C1472,96.94000244140625 1528,-4 1646.906005859375,-4 C1765.623779296875,-4 1830.114990234375,99.48485565185547 1868.77880859375,209.3712158203125 C1907,318 1954,385 2052,385 C2133,385 2197,325 2197,212 C2197,87 2115.90087890625,-7 2013.41845703125,-8 C1923.234130859375,-9 1864,64 1870,174 C1877,296 1951,385 2048,385 C2104,385 2151.03564453125,360.1071472167969 2188,333 C2288.21435546875,259.8928527832031 2365.4287109375,305.0714416503906 2395,377.3571472167969 " fill="none" stroke="#ffffff" strokeWidth="60" strokeLinecap="round"/>
                 </g>
               </svg>
-              
-              <span className="font-medium tracking-tight text-xl sm:text-3xl">hello, {firstName}</span>
-              <span className="ml-1 inline-block origin-bottom-right hover:animate-pulse cursor-default text-2xl">👋</span>
+              <span className="font-medium tracking-tight">, {firstName}</span>
+              <span className="ml-1 inline-block origin-bottom-right hover:animate-pulse cursor-default text-xl sm:text-2xl">👋</span>
             </span>
-            <button 
-              onClick={handleSignOut} 
-              className="p-3 text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition-all sm:ml-4" 
-              title="Log Out">
-              <LogOut className="w-6 h-6" />
-            </button>
         </div>
       </div>
 
@@ -377,7 +333,6 @@ export default function UserDashboard() {
                     </p>
                     <p className="text-xs text-slate-500">Spreadsheet Matrix (.CSV, .XLSX)</p>
                   </div>
-                  {/* MOBILE COMPATIBLE MIME-TYPES INCORPORATED */}
                   <input 
                     type="file" 
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
