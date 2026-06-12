@@ -10,18 +10,20 @@ export default function AdminDashboard() {
   })
 
   const [accountState, setAccountState] = useState('ACTIVE')
-  const [evidenceFile, setEvidenceFile] = useState(() => localStorage.getItem('WAYNE_ENT_EVIDENCE_FILE') || null)
   const [aiReport, setAiReport] = useState(() => localStorage.getItem('WAYNE_ENT_REPORT') || "Awaiting velocity event triggers...")
   const [aiLoading, setAiLoading] = useState(false)
 
   const [usersList, setUsersList] = useState([])
 
   const activeOperativesCount = usersList.filter(user => user.status === 'ONLINE').length;
+  
+  // DYNAMIC EVIDENCE FETCHING: Instead of reading localStorage, we pull the exact file linked to the blocked user from the server
   const blockedUser = usersList.find(user => user.status === 'BLOCKED');
+  const dynamicEvidenceFile = blockedUser?.evidence || null;
 
   const isStillBrewing = (text) => text.includes("Awaiting") || text.includes("Generating") || text.includes("System locked") || text.includes("analyzing");
 
-  // TRUE GLOBAL SYNC: Admin Dashboard now derives its lock state entirely from the Database
+  // TRUE GLOBAL SYNC: Admin Dashboard derives its lock state entirely from the Database stream
   useEffect(() => {
     if (usersList.some(user => user.status === 'BLOCKED')) {
       setAccountState('BLOCKED');
@@ -29,6 +31,10 @@ export default function AdminDashboard() {
       setAccountState('ACTIVE');
     }
   }, [usersList]);
+
+  useEffect(() => {
+    localStorage.setItem('WAYNE_ENT_REPORT', aiReport)
+  }, [aiReport])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -307,12 +313,12 @@ export default function AdminDashboard() {
                       </td>
 
                       <td className="py-4 text-center">
-                        {evidenceFile ? (
+                        {dynamicEvidenceFile ? (
                           <a 
-                            href={`${import.meta.env.VITE_API_BASE_URL}/api/v1/datasets/download/${evidenceFile}`}
+                            href={`${import.meta.env.VITE_API_BASE_URL}/api/v1/datasets/download/${dynamicEvidenceFile}`}
                             download
                             className="p-2 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-all duration-200 active:scale-90 mx-auto block w-max"
-                            title={`Download dataset: ${evidenceFile}`}
+                            title={`Download dataset: ${dynamicEvidenceFile}`}
                           >
                             <Database className="w-5 h-5 mx-auto" />
                             <span className="text-[10px] font-bold block mt-1 uppercase tracking-wider text-slate-400">File</span>

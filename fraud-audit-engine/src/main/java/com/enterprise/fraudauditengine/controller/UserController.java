@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @RestController
@@ -16,6 +18,10 @@ public class UserController {
     private final UserRepository userRepository;
     private final com.enterprise.fraudauditengine.service.EmailService emailService;
 
+    // IN-MEMORY SECURITY STATES: Decouples the session status from the security blocklist
+    private final Set<String> blockedEmails = ConcurrentHashMap.newKeySet();
+    private final Map<String, String> userEvidenceFiles = new ConcurrentHashMap<>();
+
     public UserController(UserRepository userRepository, com.enterprise.fraudauditengine.service.EmailService emailService) {
         this.userRepository = userRepository;
         this.emailService = emailService;
@@ -24,14 +30,13 @@ public class UserController {
     @PutMapping("/{id}/approve")
     public ResponseEntity<?> approveUser(@PathVariable Long id) {
         return userRepository.findById(id).map(user -> {
-            user.setStatus("OFFLINE"); // "OFFLINE" means cleared to login
+            user.setStatus("OFFLINE"); 
             userRepository.save(user);
             emailService.sendAccessGrantedEmail(user.getEmail());
             return ResponseEntity.ok(Map.of("message", "Operative cleared."));
         }).orElse(ResponseEntity.badRequest().body(Map.of("error", "Operative not found.")));
     }
 
-    // Admin God-Eye View: Fetches all users with full parameters safely
     @GetMapping
     public ResponseEntity<?> getAllUsers() {
         return ResponseEntity.ok(userRepository.findAll().stream()
@@ -40,7 +45,14 @@ public class UserController {
                     userMap.put("id", u.getId());
                     userMap.put("name", u.getName());
                     userMap.put("email", u.getEmail());
-                    userMap.put("status", u.getStatus() != null ? u.getStatus() : "OFFLINE");
+                    
+                    // ENFORCE BLOCKLIST OVERRIDE
+                    String realStatus = blockedEmails.contains(u.getEmail()) ? "BLOCKED" : (u.getStatus() != null ? u.getStatus() : "OFFLINE");
+                    userMap.put("status", realStatus);
+                    
+                    // ATTACH LIVE EVIDENCE FILE
+                    userMap.put("evidence", userEvidenceFiles.getOrDefault(u.getEmail(), null));
+                    
                     userMap.put("age", u.getAge() != null ? u.getAge() : "CLASSIFIED");
                     userMap.put("sex", u.getSex() != null ? u.getSex() : "CLASSIFIED");
                     userMap.put("dob", u.getDob() != null ? u.getDob() : "CLASSIFIED");
@@ -50,12 +62,14 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
-    // ==========================================
-    // CROSS-DEVICE SYNCHRONIZATION ENDPOINTS
-    // ==========================================
-
     @PostMapping("/lockdown")
-    public ResponseEntity<?> triggerLockdown(@RequestParam String email) {
+    public ResponseEntity<?> triggerLockdown(@RequestParam String email, @RequestParam(required = false) String evidence) {
+        // Securely map the evidence file to the user on the server
+        blockedEmails.add(email);
+        if (evidence != null && !evidence.isEmpty()) {
+            userEvidenceFiles.put(email, evidence);
+        }
+        
         return userRepository.findByEmail(email).map(user -> {
             user.setStatus("BLOCKED");
             userRepository.save(user);
@@ -65,7 +79,10 @@ public class UserController {
 
     @PostMapping("/global-unlock")
     public ResponseEntity<?> globalUnlock() {
-        // Fetch all users currently marked as BLOCKED and reset them
+        // Wipe the security blocklist and destroy the file maps
+        blockedEmails.clear();
+        userEvidenceFiles.clear();
+        
         List<Object> unlockedCount = userRepository.findAll().stream()
             .filter(u -> "BLOCKED".equals(u.getStatus()))
             .map(u -> {
@@ -80,22 +97,34 @@ public class UserController {
         ));
     }
 
-    // ==========================================
+    @PutMapping("/email/{email}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable String email, @RequestParam String status) {
+        return userRepository.findByEmail(email).map(user -> {
+            // Prevent users from bypassing a block by logging in/out
+            if (blockedEmails.contains(email)) {
+                return ResponseEntity.ok(Map.of("message", "Status change rejected. Operative is locked."));
+            }
+            user.setStatus(status);
+            userRepository.save(user);
+            return ResponseEntity.ok(Map.of("message", "Status updated to " + status));
+        }).orElse(ResponseEntity.notFound().build());
+    }
 
-    // Admin Wipe: Deletes a specific user by their database ID
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deregisterUser(@PathVariable Long id) {
-        if (!userRepository.existsById(id)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Operative not found."));
-        }
-        userRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("message", "Operative data completely wiped from the master node."));
+        return userRepository.findById(id).map(u -> {
+            blockedEmails.remove(u.getEmail());
+            userEvidenceFiles.remove(u.getEmail());
+            userRepository.deleteById(id);
+            return ResponseEntity.ok(Map.of("message", "Operative data wiped."));
+        }).orElse(ResponseEntity.badRequest().body(Map.of("error", "Operative not found.")));
     }
     
-    // Self Wipe: Allows an operative to delete their own account using their email
     @DeleteMapping("/email/{email}")
     public ResponseEntity<?> deregisterSelf(@PathVariable String email) {
         return userRepository.findByEmail(email).map(user -> {
+            blockedEmails.remove(email);
+            userEvidenceFiles.remove(email);
             userRepository.delete(user);
             return ResponseEntity.ok(Map.of("message", "Your data has been permanently wiped from the system."));
         }).orElseGet(() -> ResponseEntity.badRequest().body(Map.of("error", "Operative not found.")));
@@ -103,9 +132,17 @@ public class UserController {
 
     @GetMapping("/email/{email}")
     public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
-        return userRepository.findByEmail(email)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return userRepository.findByEmail(email).map(u -> {
+            java.util.Map<String, Object> userMap = new java.util.HashMap<>();
+            userMap.put("id", u.getId());
+            userMap.put("name", u.getName());
+            userMap.put("email", u.getEmail());
+            
+            // Enforce live blocklist reading
+            String realStatus = blockedEmails.contains(u.getEmail()) ? "BLOCKED" : (u.getStatus() != null ? u.getStatus() : "OFFLINE");
+            userMap.put("status", realStatus);
+            return ResponseEntity.ok(userMap);
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/email/{email}/details")

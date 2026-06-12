@@ -20,6 +20,16 @@ export default function UserDashboard() {
   })
 
   const [firstName, setFirstName] = useState('');
+
+  // INSTANT ONLINE STATUS PING
+  useEffect(() => {
+    const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
+    if (email) {
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/email/${email}/status?status=ONLINE`, { 
+        method: 'PUT' 
+      }).catch(console.error);
+    }
+  }, []);
   
   // LIVE DATABASE HEARTBEAT
   useEffect(() => {
@@ -169,10 +179,11 @@ export default function UserDashboard() {
     localStorage.setItem('WAYNE_ENT_REPORT', "Generating Gemini Forensic Report...")
     localStorage.setItem('WAYNE_ENT_BLOCKED_USER', localStorage.getItem('WAYNE_ENT_USER_EMAIL'))
 
-    // Central Database Broadcast Trigger
+    // Central Database Broadcast Trigger WITH Dynamic File Name
     const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL')
+    const fileName = csvFile ? encodeURIComponent(csvFile.name) : 'unknown_evidence.csv';
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/lockdown?email=${email}`, {
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/lockdown?email=${email}&evidence=${fileName}`, {
         method: 'POST'
       })
     } catch (err) {
@@ -212,7 +223,6 @@ export default function UserDashboard() {
           
           if (data.anomaliesDetected > 0) {
               executeLockdown()
-              localStorage.setItem('WAYNE_ENT_EVIDENCE_FILE', csvFile.name) 
           }
         } catch (err) {
            setBatchResults({ totalProcessed: "SUCCESS", anomaliesDetected: "RAW RESPONSE" })
@@ -251,6 +261,20 @@ export default function UserDashboard() {
     }
   }
 
+  const handleSignOut = async () => {
+    const email = localStorage.getItem('WAYNE_ENT_USER_EMAIL');
+    if (email) {
+      try {
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/users/email/${email}/status?status=OFFLINE`, { 
+          method: 'PUT' 
+        });
+      } catch(e) {}
+    }
+    localStorage.removeItem('WAYNE_ENT_TOKEN');
+    localStorage.removeItem('WAYNE_ENT_USER_EMAIL');
+    window.location.href = '/login';
+  };
+
   const isErrorState = batchResults && batchResults.totalProcessed.toString().includes('ERROR');
 
   return (
@@ -270,7 +294,6 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* RESTORED MACBOOK SVG: Perfectly scaled for all devices and removed redundant logout button */}
         <div className="flex items-center w-full sm:w-auto sm:pr-4 justify-center sm:justify-end border-t border-slate-800/60 pt-4 sm:border-t-0 sm:pt-0">
             <span className="text-2xl sm:text-3xl text-white/90 drop-shadow-md flex items-center gap-2">
               <svg className="w-16 h-8 sm:w-24 sm:h-12 transform translate-y-1" viewBox="-109 -9 2504 746" xmlns="http://www.w3.org/2000/svg">
